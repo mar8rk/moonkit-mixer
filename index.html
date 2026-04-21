@@ -531,9 +531,9 @@
     header h1 { font-size: 1.4rem; }
     #stage { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; }
     .stage-slot { min-height: 75px; border-radius: 14px; }
-    .stage-character .char-avatar { width: 40px; height: 40px; font-size: 1.3rem; }
+    .stage-character .char-avatar { width: 40px; height: 40px; }
     .char-card { width: 72px; padding: 8px 5px; }
-    .char-card .card-avatar { width: 38px; height: 38px; font-size: 1.2rem; }
+    .char-card .card-avatar { width: 38px; height: 38px; }
     #controls { gap: 10px; }
     .control-group input[type="range"] { width: 60px; }
     .lore-card { max-width: 340px; }
@@ -656,7 +656,6 @@ const CHARACTERS = [
   // ── Phase 1 ──
   {
     id: 'cracklecorn', name: 'Cracklecorn', emoji: '🦄',
-    evoEmoji: ['🦄','🦄','🦄','🌩️'],
     title: 'Static Unicorn', role: 'kick', roleLabel: 'KICK',
     color: '#ff1493', bg: 'radial-gradient(circle at 35% 35%, #4a0e2e, #2a0018)',
     description: 'Born in a lightning storm at the candy factory. Her horn crackles with electricity and every stomp shakes the ground.',
@@ -671,7 +670,6 @@ const CHARACTERS = [
   },
   {
     id: 'thump', name: 'Thump', emoji: '🐻',
-    evoEmoji: ['🐻','🐻','🧸','💀'],
     title: 'Skeleton Bear', role: 'snare', roleLabel: 'SNARE',
     color: '#f0e6d2', bg: 'radial-gradient(circle at 35% 35%, #3d2b1a, #1a0f05)',
     description: 'A tiny bear made of moonlit bones. His claps echo through haunted forests and make the trees shiver.',
@@ -686,7 +684,6 @@ const CHARACTERS = [
   },
   {
     id: 'skritches', name: 'Skritches', emoji: '🐰',
-    evoEmoji: ['🐰','🐰','🦇','🦇'],
     title: 'Bat Bunny', role: 'hihat', roleLabel: 'HI-HAT',
     color: '#c0c0c0', bg: 'radial-gradient(circle at 35% 35%, #2a2a3a, #0e0e18)',
     description: 'Half bunny, half bat, all mischief. Her oversized ears pick up every whisper and she taps out rhythms with tiny silver claws.',
@@ -701,7 +698,6 @@ const CHARACTERS = [
   },
   {
     id: 'bloop', name: 'Bloop', emoji: '🪼',
-    evoEmoji: ['🪼','🪼','🌊','🌀'],
     title: 'Ghost Jellyfish', role: 'bass', roleLabel: 'BASS',
     color: '#00e5ff', bg: 'radial-gradient(circle at 35% 35%, #0a2a3a, #020e14)',
     description: 'Floats through walls humming deep notes that make your chest vibrate. Nobody knows if Bloop is alive, dead, or somewhere in between.',
@@ -717,7 +713,6 @@ const CHARACTERS = [
   },
   {
     id: 'glimmer', name: 'Glimmer', emoji: '🕷️',
-    evoEmoji: ['🕷️','🕷️','🕸️','✨'],
     title: 'Crystal Spider', role: 'melody', roleLabel: 'MELODY',
     color: '#ffd700', bg: 'radial-gradient(circle at 35% 35%, #3a2a00, #1a1200)',
     description: 'Weaves webs of pure sound that shimmer like gold in moonlight. Each strand plays a different note when the wind blows through.',
@@ -733,7 +728,6 @@ const CHARACTERS = [
   },
   {
     id: 'lunara', name: 'Lunara', emoji: '🐱',
-    evoEmoji: ['🐱','🐱','😺','🌟'],
     title: 'Moon Kitten', role: 'pad', roleLabel: 'PAD',
     color: '#b14eff', bg: 'radial-gradient(circle at 35% 35%, #2c1654, #120a28)',
     description: 'Born with three eyes that see in three different dimensions. Her purr is a chord that resonates across the astral plane.',
@@ -746,7 +740,6 @@ const CHARACTERS = [
   },
   {
     id: 'mosswick', name: 'Mosswick', emoji: '🍄',
-    evoEmoji: ['🍄','🍄','🌿','💫'],
     title: 'Spore Sprite', role: 'fx', roleLabel: 'FX',
     color: '#2ecc71', bg: 'radial-gradient(circle at 35% 35%, #0a2a14, #041208)',
     description: 'A tiny mushroom creature that releases musical spores when surprised. Each spore pops with a different otherworldly tone.',
@@ -761,7 +754,6 @@ const CHARACTERS = [
   },
   {
     id: 'whispurr', name: 'Whispurr', emoji: '🐈‍⬛',
-    evoEmoji: ['🐈‍⬛','🐈‍⬛','👁️','🌑'],
     title: 'Shadow Cat', role: 'ambient', roleLabel: 'AMBIENT',
     color: '#8e44ad', bg: 'radial-gradient(circle at 35% 35%, #1a0a2e, #0a0418)',
     description: 'Appears only at twilight, trailing wisps of dark mist. Her whisper fills the silence between sounds with something eerie and beautiful.',
@@ -774,7 +766,6 @@ const CHARACTERS = [
   // ── Phase 2 ──
   {
     id: 'clickette', name: 'Clickette', emoji: '🦎',
-    evoEmoji: ['🦎','🦎','🌈','🔮'],
     title: 'Prismatic Gecko', role: 'clap', roleLabel: 'CLAP',
     color: '#ff6b6b', bg: 'radial-gradient(circle at 35% 35%, #4a1a1a, #2a0808)',
     description: 'Changes color with every clap. Found sleeping inside a prism, she woke up refracting sound into shimmering percussive rainbows.',
@@ -789,7 +780,6 @@ const CHARACTERS = [
   },
   {
     id: 'zephyr', name: 'Zephyr', emoji: '🦋',
-    evoEmoji: ['🦋','🦋','🦋','🪽'],
     title: 'Dream Moth', role: 'arp', roleLabel: 'ARP',
     color: '#e879f9', bg: 'radial-gradient(circle at 35% 35%, #3a1048, #1a0828)',
     description: 'Drifts through dreams collecting melodies she finds there. Her wings scatter rapid cascades of notes like falling stars.',
@@ -805,7 +795,6 @@ const CHARACTERS = [
   },
   {
     id: 'echomaw', name: 'Echomaw', emoji: '🐸',
-    evoEmoji: ['🐸','🐸','👄','🌀'],
     title: 'Void Toad', role: 'vocal', roleLabel: 'VOCAL',
     color: '#a3e635', bg: 'radial-gradient(circle at 35% 35%, #1a2e0a, #0a1604)',
     description: 'Sits on the edge of a bottomless pit and sings into it. What comes back is never quite the same sound, but always hauntingly beautiful.',
@@ -820,7 +809,6 @@ const CHARACTERS = [
   },
   {
     id: 'rumble', name: 'Rumble', emoji: '🐢',
-    evoEmoji: ['🐢','🐢','🪨','🌋'],
     title: 'Stone Tortoise', role: 'sub', roleLabel: 'SUB',
     color: '#78716c', bg: 'radial-gradient(circle at 35% 35%, #2a2620, #141210)',
     description: 'Ten thousand years old and still humming. Rumble moves so slowly that the ground vibrates in sympathy — a living subwoofer.',
@@ -835,7 +823,6 @@ const CHARACTERS = [
   // ── Phase 3 ──
   {
     id: 'corveth', name: 'Corveth', emoji: '🐦‍⬛',
-    evoEmoji: ['🐦‍⬛','🐦‍⬛','🪶','✦'],
     title: 'Void Raven', role: 'pluck', roleLabel: 'PLUCK',
     color: '#4f86c6', bg: 'radial-gradient(circle at 35% 35%, #0a1a3a, #040e20)',
     description: 'A raven woven from compressed starlight. Each tap of its crystalline beak on hollow moonbones sounds a perfectly tuned pluck that lingers for seconds.',
@@ -852,7 +839,6 @@ const CHARACTERS = [
   },
   {
     id: 'flicker', name: 'Flicker', emoji: '🪲',
-    evoEmoji: ['🪲','🪲','✨','💎'],
     title: 'Glow Beetle', role: 'chord', roleLabel: 'CHORD',
     color: '#f59e0b', bg: 'radial-gradient(circle at 35% 35%, #3a2a00, #1a1000)',
     description: 'A bioluminescent beetle found sleeping inside a hollow log, humming polyphonically. Flashes in Cm chords when excited, startled, or just feeling it.',
@@ -868,7 +854,6 @@ const CHARACTERS = [
   },
   {
     id: 'murk', name: 'Murk', emoji: '🐊',
-    evoEmoji: ['🐊','🐊','🌿','🌑'],
     title: 'Shadow Gator', role: 'growl', roleLabel: 'GROWL',
     color: '#059669', bg: 'radial-gradient(circle at 35% 35%, #012918, #000f0a)',
     description: "An ancient gator made of compressed swamp-shadow who hasn't moved since the last ice age. Her growl rolls through mud and makes stones hum in sympathy.",
@@ -885,7 +870,6 @@ const CHARACTERS = [
   },
   {
     id: 'nimbus', name: 'Nimbus', emoji: '⛈️',
-    evoEmoji: ['⛈️','🌩️','🌤️','🔔'],
     title: 'Storm Cloud', role: 'bell', roleLabel: 'BELL',
     color: '#7dd3fc', bg: 'radial-gradient(circle at 35% 35%, #0a1e3a, #040a1a)',
     description: 'A tiny storm cloud that rings like crystal when lightning passes through. Drops bell tones from impossible heights. Each tone lasts longer than the last.',
@@ -2260,10 +2244,17 @@ function renderCatalystBar() {
     labelEl.className = 'cat-label';
     labelEl.textContent = cat.effectLabel;
 
+    const infoBtn = document.createElement('div');
+    infoBtn.className = 'card-info';
+    infoBtn.textContent = '?';
+    infoBtn.addEventListener('click', e => { e.stopPropagation(); openCatalystLore(cat); });
+
+    card.appendChild(infoBtn);
     card.appendChild(avatar);
     card.appendChild(nameEl);
     card.appendChild(labelEl);
-    card.addEventListener('click', () => {
+    card.addEventListener('click', e => {
+      if (e.target === infoBtn) return;
       activeCatalyst?.id === cat.id ? deactivateCatalyst() : activateCatalyst(cat);
     });
     bar.appendChild(card);
@@ -2424,6 +2415,34 @@ function openLoreCard(char) {
   modal.classList.add('open');
 }
 function closeLoreCard() { document.getElementById('lore-modal').classList.remove('open'); }
+
+function openCatalystLore(cat) {
+  const modal = document.getElementById('lore-modal');
+  const card = modal.querySelector('.lore-card');
+  card.style.setProperty('--lore-color', cat.color);
+
+  const loreAvatarEl = document.getElementById('lore-avatar');
+  loreAvatarEl.innerHTML = '';
+  loreAvatarEl.style.background = cat.bg;
+  loreAvatarEl.style.boxShadow = `0 0 30px ${cat.color}50`;
+  loreAvatarEl.appendChild(makeSprite(cat, 0, 72));
+
+  document.getElementById('lore-name').textContent = cat.name;
+  document.getElementById('lore-name').style.color = cat.color;
+  document.getElementById('lore-title').textContent = cat.title + ' · CATALYST · ' + cat.effectLabel;
+  document.getElementById('lore-origin').textContent = cat.description;
+
+  const evoC = document.getElementById('lore-evo');
+  evoC.innerHTML = '';
+  const effectDiv = document.createElement('div');
+  effectDiv.className = 'lore-evo-stage current';
+  effectDiv.innerHTML = `<div class="evo-label">Effect</div><div class="evo-desc">${cat.effectLabel} — when active, transforms all creatures on stage</div>`;
+  evoC.appendChild(effectDiv);
+
+  document.getElementById('lore-rels').innerHTML = '<span style="font-size:0.7rem;color:var(--text-muted)">Affects all creatures on stage</span>';
+
+  modal.classList.add('open');
+}
 
 // ===================================================================
 // MOOD + FX CONTROLS

@@ -1,4 +1,4 @@
-const CACHE = 'moonkit-v3';
+const CACHE = 'moonkit-v4';
 
 self.addEventListener('install', e => {
   const scope = self.registration.scope;
