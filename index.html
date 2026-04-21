@@ -470,6 +470,61 @@
 
   .is-playing #stage { border-color: rgba(177, 78, 255, 0.15); }
 
+  /* ===== CATALYST ZONE ===== */
+  #catalyst-zone {
+    width: 100%; max-width: 780px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  #catalyst-zone-label {
+    font-size: 0.7rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 2px; text-align: center;
+  }
+  #catalyst-bar {
+    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  }
+  .catalyst-card {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 10px; border-radius: 14px; cursor: pointer;
+    border: 1.5px solid rgba(140, 80, 200, 0.25);
+    background: rgba(20, 5, 40, 0.6);
+    transition: all 0.3s ease; min-width: 68px;
+    position: relative;
+  }
+  .catalyst-card:hover { border-color: rgba(177, 78, 255, 0.5); transform: translateY(-2px); }
+  .catalyst-card.active {
+    border-style: solid; border-width: 2px;
+    animation: catalystPulse 2s ease-in-out infinite;
+  }
+  .catalyst-card .cat-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .catalyst-card .cat-name { font-size: 0.6rem; font-weight: 600; text-align: center; white-space: nowrap; }
+  .catalyst-card .cat-label { font-size: 0.48rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+  @keyframes catalystPulse {
+    0%, 100% { box-shadow: 0 0 8px var(--cat-color, #b14eff); }
+    50% { box-shadow: 0 0 24px var(--cat-color, #b14eff), 0 0 48px color-mix(in srgb, var(--cat-color, #b14eff) 40%, transparent); }
+  }
+
+  /* Catalyst global visual effects */
+  #app.catalyst-blessed .char-avatar canvas { filter: brightness(1.1) saturate(0.9); }
+  #app.catalyst-blessed .stage-slot.occupied { box-shadow: 0 0 20px rgba(255, 215, 0, 0.15); }
+  #app.catalyst-cursed .char-avatar canvas { filter: hue-rotate(40deg) saturate(0.75) brightness(0.85); }
+  #app.catalyst-cursed .stage-slot.occupied { box-shadow: 0 0 20px rgba(177, 78, 255, 0.15); }
+  #app.catalyst-wild .char-avatar canvas { filter: saturate(1.6) brightness(1.15); }
+  #app.catalyst-wild .stage-slot.occupied { box-shadow: 0 0 20px rgba(255, 69, 0, 0.15); }
+  #app.catalyst-evil .char-avatar canvas { filter: brightness(0.65) saturate(0.4) hue-rotate(280deg); }
+  #app.catalyst-evil .stage-slot.occupied { box-shadow: 0 0 20px rgba(124, 58, 237, 0.15); }
+
+  #catalyst-active-banner {
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; padding: 3px 10px; border-radius: 6px;
+    animation: bannerBlink 2s ease-in-out infinite;
+    display: none;
+  }
+  #catalyst-active-banner.visible { display: block; }
+  @keyframes bannerBlink { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+
   /* ===== RESPONSIVE ===== */
   @media (max-width: 700px) {
     #start-screen h1 { font-size: 2.5rem; }
@@ -493,7 +548,7 @@
   <div class="start-emoji">🌙</div>
   <h1>Moonkit Mixer</h1>
   <p>click anywhere to start jamming</p>
-  <div class="version-tag">v3 — 16 creatures · step sequencer · reverb · share</div>
+  <div class="version-tag">v4 — pixel art sprites · catalysts · share</div>
   <div class="shortcuts">Space = play/stop · S = shuffle · C = clear · M = mood · R = reverb · L = lo-fi · Q = sequencer</div>
 </div>
 
@@ -558,6 +613,12 @@
     <button class="btn" id="btn-lofi">Lo&#8209;Fi</button>
     <button class="btn" id="btn-seq">&#9633; Seq</button>
     <button class="btn" id="btn-share">&#8599; Share</button>
+  </div>
+
+  <div id="catalyst-zone">
+    <div id="catalyst-zone-label">~ catalyst ~</div>
+    <div id="catalyst-bar"></div>
+    <div id="catalyst-active-banner"></div>
   </div>
 
   <div id="char-bar-label">~ your creatures ~</div>
@@ -842,6 +903,470 @@ const CHARACTERS = [
 ];
 
 // ===================================================================
+// PIXEL ART SPRITES — 16×16 per creature, procedurally rendered
+// Palette indices: 0=transparent 1=dark 2=main 3=light 4=highlight
+// ===================================================================
+const SPRITES = {
+  cracklecorn: [  // unicorn, side profile
+    '0000020000000000',
+    '0000220000000000',
+    '0002221000000000',
+    '0022332100000000',
+    '0122332100000000',
+    '0122344100000000',
+    '0012222100000000',
+    '0001222100000000',
+    '0012222110000000',
+    '0122222221000000',
+    '0122222222100000',
+    '0122222221100000',
+    '0112222211100000',
+    '0001201110000000',
+    '0001201110000000',
+    '0001200010000000',
+  ],
+  thump: [  // skeleton bear, front-facing round
+    '0011100011100000',
+    '0122210122210000',
+    '0122222222210000',
+    '0122222222210000',
+    '1222222222221000',
+    '1221441441221000',
+    '1222222222221000',
+    '1224222224221000',
+    '0122222222210000',
+    '0122222222210000',
+    '1222222222221000',
+    '1222222222221000',
+    '0122222222210000',
+    '0012211221000000',
+    '0012211221000000',
+    '0012200220000000',
+  ],
+  skritches: [  // bat-bunny, tall ears + wings
+    '0120000000210000',
+    '0122000002210000',
+    '0122222222210000',
+    '0012222221000000',
+    '1002222220010000',
+    '1002222220010000',
+    '0102244220100000',
+    '0012224210000000',
+    '0012222100000000',
+    '0001221100000000',
+    '0001221100000000',
+    '0000121100000000',
+    '0000111100000000',
+    '0000111100000000',
+    '0001100110000000',
+    '0001100110000000',
+  ],
+  bloop: [  // ghost jellyfish, dome + tentacles
+    '0000122210000000',
+    '0001222221000000',
+    '0012233221000000',
+    '0122222222100000',
+    '0122222222100000',
+    '0012222221000000',
+    '0001212121000000',
+    '0001100110000000',
+    '0000100110000000',
+    '0000100010000000',
+    '0000100110000000',
+    '0000000100000000',
+    '0000000110000000',
+    '0000000010000000',
+    '0000000010000000',
+    '0000000000000000',
+  ],
+  glimmer: [  // crystal spider, 8-legged
+    '1000100000100010',
+    '0100100001000100',
+    '0010122222100100',
+    '0001234443210000',
+    '0001244442100000',
+    '0001234443210000',
+    '0010122222100100',
+    '0100100001000100',
+    '1000100000100010',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  lunara: [  // 3-eyed moon kitten
+    '0010000000100000',
+    '0122000002210000',
+    '0122111112210000',
+    '1222222222221000',
+    '1222222222221000',
+    '1221441441221000',
+    '1222244422221000',
+    '1222244422221000',
+    '0122222222210000',
+    '0012224421000000',
+    '0012222221000000',
+    '0001222111000000',
+    '0000122100000000',
+    '0000000000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  mosswick: [  // mushroom cap + stem
+    '0001222211000000',
+    '0012222222100000',
+    '0122222222210000',
+    '1222222222221000',
+    '1223222232221000',
+    '1222222222221000',
+    '0122222222210000',
+    '0012222222100000',
+    '0001112211000000',
+    '0000122210000000',
+    '0000122210000000',
+    '0000122210000000',
+    '0000122210000000',
+    '0001122211000000',
+    '0001222221000000',
+    '0000000000000000',
+  ],
+  whispurr: [  // shadow cat + wispy tail
+    '0010000000100000',
+    '0122000002210000',
+    '1222111112221000',
+    '1222222222221000',
+    '1222222222221000',
+    '1221221221221000',
+    '1222222222221000',
+    '0122222222210000',
+    '0012222221000000',
+    '0001222110000001',
+    '0001222100000010',
+    '0000012200000100',
+    '0000001000001000',
+    '0000001000010000',
+    '0000000000100000',
+    '0000000001000000',
+  ],
+  clickette: [  // prismatic gecko, vertical
+    '0000000000000000',
+    '0001222210000000',
+    '0012233221000000',
+    '0012244221000000',
+    '0012222221000000',
+    '0001222210000000',
+    '0000122210000000',
+    '0000122210000000',
+    '0001122211000000',
+    '0001222211000000',
+    '0001222211000000',
+    '0001122210000000',
+    '0000011100000000',
+    '0000010100000000',
+    '0000010000000000',
+    '0000000000000000',
+  ],
+  zephyr: [  // dream moth, wings spread
+    '1000000000000001',
+    '0100222220000010',
+    '0010222222100100',
+    '0001232332000000',
+    '0001232332100000',
+    '0001222222100000',
+    '0000112211000000',
+    '0000112211000000',
+    '0000112211000000',
+    '0001122110000000',
+    '0001221100000000',
+    '0001211000000000',
+    '0001100000000000',
+    '0001000000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  echomaw: [  // void toad, wide eyes + mouth
+    '0000000000000000',
+    '0001111110000000',
+    '0012222221000000',
+    '0122222222100000',
+    '1222222222221000',
+    '1224412244221000',
+    '1224412244221000',
+    '1222222222221000',
+    '0122222222210000',
+    '0122244422210000',
+    '0122222222210000',
+    '0012222221000000',
+    '0012222221000000',
+    '0001211210000000',
+    '0001211210000000',
+    '0001100110000000',
+  ],
+  rumble: [  // stone tortoise, shell top-view
+    '0000000000000000',
+    '0001122211000000',
+    '0012222221000000',
+    '0012212121000000',
+    '0012222221000000',
+    '0012212121000000',
+    '0012222221000000',
+    '0001122211000000',
+    '0001122211000000',
+    '0000122210000000',
+    '0000122210000000',
+    '0001222210000000',
+    '0001222110000000',
+    '0001122110000000',
+    '0001100010000000',
+    '0000000000000000',
+  ],
+  corveth: [  // void raven, wings folded
+    '0000000001000000',
+    '0001122210000000',
+    '0012222221000000',
+    '0012244221000000',
+    '0012222211000000',
+    '0001222111000000',
+    '0001111000000000',
+    '0001222210000000',
+    '0012222222100000',
+    '0122222222210000',
+    '1222222222221000',
+    '0122222222210000',
+    '0012222222100000',
+    '0001222210000000',
+    '0001221000000000',
+    '0000110000000000',
+  ],
+  flicker: [  // glow beetle, wing cases
+    '0000000000000000',
+    '0001122211000000',
+    '0012244221000000',
+    '0001122211000000',
+    '0000111100000000',
+    '0001222211100000',
+    '0012222222100000',
+    '0012232222100000',
+    '0012222222100000',
+    '0012222222100000',
+    '0001222221000000',
+    '0001211211000000',
+    '0001200210000000',
+    '0000100100000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  murk: [  // shadow gator, snout forward + teeth
+    '0000000000000000',
+    '0001000010000000',
+    '0001100110000000',
+    '0012222221000000',
+    '0012222221000000',
+    '0012222221000000',
+    '1222222222221000',
+    '1222222222221000',
+    '1221111111221000',
+    '1222222222221000',
+    '0122222222210000',
+    '0012222221000000',
+    '0012222221000000',
+    '0001222110000000',
+    '0001100000000000',
+    '0000000000000000',
+  ],
+  // ── Catalysts ──
+  seraph: [  // angel, halo + wings
+    '0000034430000000',
+    '0000344340000000',
+    '0000034430000000',
+    '0000022200000000',
+    '0300122130000000',
+    '0330122133000000',
+    '3330012103330000',
+    '3333001200333000',
+    '0000012100000000',
+    '0000022200000000',
+    '0000122210000000',
+    '0001222221000000',
+    '0001222221000000',
+    '0000122210000000',
+    '0000011100000000',
+    '0000000000000000',
+  ],
+  hex: [  // witch hat + glowing eyes
+    '0000020000000000',
+    '0000220000000000',
+    '0002222000000000',
+    '0022222200000000',
+    '0011111100000000',
+    '0000000000000000',
+    '0001222100000000',
+    '0012244210000000',
+    '0012244210000000',
+    '0012222210000000',
+    '0001222100000000',
+    '0001222100000000',
+    '0012222210000000',
+    '0012222210000000',
+    '0001111100000000',
+    '0000000000000000',
+  ],
+  voltara: [  // electric spark creature
+    '0040000000000040',
+    '0004000400000000',
+    '0000400040000000',
+    '0001222210000000',
+    '0012244221000000',
+    '0012244221000000',
+    '0001222210000000',
+    '4001122114000000',
+    '0001222210000000',
+    '0001222210000000',
+    '4001222114000000',
+    '0001122110000000',
+    '0000111100000000',
+    '0004040400000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  umbra: [  // void shadow with giant eye
+    '0000000000000000',
+    '0001111110000000',
+    '0011222211000000',
+    '0112244221100000',
+    '1122444422110000',
+    '1122444422110000',
+    '0112244221100000',
+    '0011222211000000',
+    '0001111110000000',
+    '0000111000000000',
+    '0000010000000000',
+    '0001010100000000',
+    '0000101000000000',
+    '0000010000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+  nimbus: [  // storm cloud + lightning bolt
+    '0001222210000000',
+    '0012222221000000',
+    '0122222222100000',
+    '1222222222210000',
+    '1222222222210000',
+    '0122222222210000',
+    '0012222222100000',
+    '0001222221000000',
+    '0000022220000000',
+    '0000032000000000',
+    '0000023000000000',
+    '0000002200000000',
+    '0000003000000000',
+    '0000002000000000',
+    '0000000000000000',
+    '0000000000000000',
+  ],
+};
+
+// ===================================================================
+// CATALYST CHARACTERS — 4 special creatures that transform the stage
+// ===================================================================
+const CATALYSTS = [
+  {
+    id: 'seraph', name: 'Seraph', effectLabel: 'BLESSED',
+    title: 'Blessing Spirit',
+    color: '#ffd700', bg: 'radial-gradient(circle at 35% 35%, #3a2800, #1a1000)',
+    description: 'A luminous sprite that blesses all creatures with harmonic light, lengthening their voices and wrapping the stage in warm reverb.',
+    cssClass: 'catalyst-blessed',
+    moodMods: { reverbWetAdd: 0.2, decayMult: 1.4, filterMult: 0.85, detuneMult: 0.5, pitchShift: 0, tempoMult: 1 },
+  },
+  {
+    id: 'hex', name: 'Hex', effectLabel: 'CURSED',
+    title: 'Curse Witch',
+    color: '#b14eff', bg: 'radial-gradient(circle at 35% 35%, #2d1b4e, #130a22)',
+    description: 'An ancient witch who curses the stage, bending all pitches down a semitone into sinister registers.',
+    cssClass: 'catalyst-cursed',
+    moodMods: { reverbWetAdd: 0.1, decayMult: 1.1, filterMult: 0.6, detuneMult: 3.5, pitchShift: -0.056, tempoMult: 1 },
+  },
+  {
+    id: 'voltara', name: 'Voltara', effectLabel: 'WILD',
+    title: 'Storm Engine',
+    color: '#ff4500', bg: 'radial-gradient(circle at 35% 35%, #4a0a00, #200400)',
+    description: 'A living lightning bolt that supercharges every creature — cranking tempo, brightness, and chaos to maximum.',
+    cssClass: 'catalyst-wild',
+    moodMods: { reverbWetAdd: -0.1, decayMult: 0.75, filterMult: 1.6, detuneMult: 0.7, pitchShift: 0.02, tempoMult: 1.3 },
+  },
+  {
+    id: 'umbra', name: 'Umbra', effectLabel: 'EVIL',
+    title: 'Void Shadow',
+    color: '#7c3aed', bg: 'radial-gradient(circle at 35% 35%, #0a0014, #04000a)',
+    description: 'The Void itself. Where Umbra rests, all light bends. Notes become grim, detuned echoes from somewhere unknowable.',
+    cssClass: 'catalyst-evil',
+    moodMods: { reverbWetAdd: 0.3, decayMult: 1.5, filterMult: 0.3, detuneMult: 5.0, pitchShift: -0.1, tempoMult: 1 },
+  },
+];
+
+let activeCatalyst = null;
+let catalystTempoMult = 1;
+
+function getSpritePalette(char) {
+  const hex = char.color.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const dark = `rgb(${Math.round(r*0.25)},${Math.round(g*0.25)},${Math.round(b*0.25)})`;
+  const light = `rgb(${Math.min(255,Math.round(r+( 255-r)*0.45))},${Math.min(255,Math.round(g+(255-g)*0.45))},${Math.min(255,Math.round(b+(255-b)*0.45))})`;
+  return ['transparent', dark, char.color, light, '#ffffff'];
+}
+
+function drawSprite(canvas, char, evo) {
+  const rows = SPRITES[char.id];
+  if (!rows) return;
+  const size = canvas.width;
+  const scale = Math.floor(size / 16);
+  // Centroid centering: place the visual center-of-mass at canvas center
+  let cx = 0, cy = 0, count = 0;
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (parseInt(rows[y][x]) > 0) { cx += x + 0.5; cy += y + 0.5; count++; }
+    }
+  }
+  if (count === 0) return;
+  cx /= count; cy /= count;
+  const offsetX = Math.round(size / 2 - cx * scale);
+  const offsetY = Math.round(size / 2 - cy * scale);
+  const ctx2d = canvas.getContext('2d');
+  ctx2d.clearRect(0, 0, size, size);
+  const pal = getSpritePalette(char);
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const idx = parseInt(rows[y][x]);
+      if (idx === 0) continue;
+      ctx2d.fillStyle = pal[idx];
+      ctx2d.fillRect(offsetX + x * scale, offsetY + y * scale, scale, scale);
+    }
+  }
+  if (evo >= 2) {
+    ctx2d.fillStyle = `rgba(255,255,255,${0.08 + evo * 0.04})`;
+    ctx2d.fillRect(0, 0, size, size);
+  }
+}
+
+function makeSprite(char, evo, size) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  canvas.style.imageRendering = 'pixelated';
+  canvas.style.flexShrink = '0';
+  drawSprite(canvas, char, evo);
+  return canvas;
+}
+
+// ===================================================================
 // MOOD SYSTEM
 // ===================================================================
 let currentMood = 'dreamy';
@@ -850,7 +1375,19 @@ const MOODS = {
   spooky: { filterMult: 0.4, detuneMult: 2.5, decayMult: 1.6, pitchShift: -0.05, reverbWet: 0.5, label: 'Spooky' },
   wild:   { filterMult: 1.6, detuneMult: 0.6, decayMult: 0.65, pitchShift: 0.02, reverbWet: 0.15,label: 'Wild'   },
 };
-function mood() { return MOODS[currentMood]; }
+function mood() {
+  const base = MOODS[currentMood];
+  if (!activeCatalyst) return base;
+  const c = activeCatalyst.moodMods;
+  return {
+    filterMult: base.filterMult * (c.filterMult ?? 1),
+    detuneMult: base.detuneMult * (c.detuneMult ?? 1),
+    decayMult:  base.decayMult  * (c.decayMult  ?? 1),
+    pitchShift: base.pitchShift + (c.pitchShift  ?? 0),
+    reverbWet:  Math.min(0.9, Math.max(0, base.reverbWet + (c.reverbWetAdd ?? 0))),
+    label: base.label,
+  };
+}
 
 // ===================================================================
 // AUDIO ENGINE
@@ -1349,7 +1886,7 @@ function scheduleStep(step, time) {
 function scheduler() {
   while (nextStepTime < ctx.currentTime + LOOK_AHEAD) {
     scheduleStep(currentStep, nextStepTime);
-    nextStepTime += 60.0 / tempo / 4;
+    nextStepTime += 60.0 / (tempo * catalystTempoMult) / 4;
     currentStep = (currentStep + 1) % STEPS;
   }
 }
@@ -1408,7 +1945,15 @@ function renderSequencer() {
 
     const label = document.createElement('div');
     label.className = 'seq-label';
-    label.innerHTML = `<span class="seq-emoji">${cs.emoji}</span><span class="seq-char-name" style="color:${cs.color}">${cs.name}</span>`;
+    const seqSprite = makeSprite(cs, getEvoLevel(cs.id), 28);
+    seqSprite.style.borderRadius = '4px';
+    seqSprite.style.flexShrink = '0';
+    const seqName = document.createElement('span');
+    seqName.className = 'seq-char-name';
+    seqName.style.color = cs.color;
+    seqName.textContent = cs.name;
+    label.appendChild(seqSprite);
+    label.appendChild(seqName);
 
     const stepsDiv = document.createElement('div');
     stepsDiv.className = 'seq-steps';
@@ -1544,31 +2089,49 @@ function renderStage() {
     if (stageSlots[i]) {
       const char = stageSlots[i];
       const evo = getEvoLevel(char.id);
-      const displayEmoji = char.evoEmoji ? char.evoEmoji[evo] : char.emoji;
       slot.classList.add('occupied');
       if (evo > 0) slot.classList.add('evo-' + evo);
       slot.style.borderColor = char.color;
       slot.style.setProperty('--char-color', char.color);
       slot.style.background = `radial-gradient(circle at center, ${char.color}15, transparent)`;
 
-      let sparkles = '';
+      const charEl = document.createElement('div');
+      charEl.className = 'stage-character';
+      charEl.style.setProperty('--char-color', char.color);
+
+      const avatar = document.createElement('div');
+      avatar.className = 'char-avatar';
+      avatar.style.background = char.bg;
+      avatar.style.boxShadow = `0 0 ${12 + evo * 6}px ${char.color}${40 + evo * 15}`;
+      avatar.appendChild(makeSprite(char, evo, 48));
+      const evoRing = document.createElement('div');
+      evoRing.className = 'evo-ring';
+      avatar.appendChild(evoRing);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'char-name';
+      nameEl.style.color = char.color;
+      nameEl.textContent = char.name;
+
+      const roleEl = document.createElement('div');
+      roleEl.className = 'char-role';
+      roleEl.textContent = char.roleLabel;
+
+      charEl.appendChild(avatar);
+      charEl.appendChild(nameEl);
+      charEl.appendChild(roleEl);
+
       if (evo >= 3) {
         for (let s = 0; s < 4; s++) {
+          const sp = document.createElement('div');
+          sp.className = 'evo-sparkle';
           const sz = 3 + Math.random() * 3;
-          sparkles += `<div class="evo-sparkle" style="width:${sz}px;height:${sz}px;top:${Math.random()*70}%;left:${Math.random()*80+5}%;animation-delay:${s*0.5}s;"></div>`;
+          sp.style.cssText = `width:${sz}px;height:${sz}px;top:${Math.random()*70}%;left:${Math.random()*80+5}%;animation-delay:${s*0.5}s;`;
+          charEl.appendChild(sp);
         }
       }
 
-      slot.innerHTML = `
-        <div class="stage-character" style="--char-color: ${char.color}">
-          <div class="char-avatar" style="background: ${char.bg}; box-shadow: 0 0 ${12 + evo * 6}px ${char.color}${40 + evo * 15};">
-            ${displayEmoji}
-            <div class="evo-ring"></div>
-          </div>
-          <div class="char-name" style="color: ${char.color}">${char.name}</div>
-          <div class="char-role">${char.roleLabel}</div>
-          ${sparkles}
-        </div>`;
+      slot.appendChild(charEl);
       slot.addEventListener('click', () => removeFromStage(i));
     } else {
       slot.innerHTML = `<div class="slot-number">${i + 1}</div>`;
@@ -1599,21 +2162,46 @@ function renderCharacterBar() {
     if (onStage) card.classList.add('on-stage');
     card.draggable = true;
     card.dataset.charId = char.id;
-    card.innerHTML = `
-      ${char.phase === 3 ? '<div class="phase-badge">P3</div>' : ''}
-      <div class="card-info" data-char-id="${char.id}">?</div>
-      <div class="card-avatar" style="background: ${char.bg}; box-shadow: 0 0 8px ${char.color}30;">${char.emoji}</div>
-      <div class="card-name" style="color: ${char.color}">${char.name}</div>
-      <div class="card-role">${char.roleLabel}</div>`;
+    if (char.phase === 3) {
+      const badge = document.createElement('div');
+      badge.className = 'phase-badge';
+      badge.textContent = 'P3';
+      card.appendChild(badge);
+    }
+    const infoBtn = document.createElement('div');
+    infoBtn.className = 'card-info';
+    infoBtn.dataset.charId = char.id;
+    infoBtn.textContent = '?';
+    card.appendChild(infoBtn);
+
+    const cardAvatar = document.createElement('div');
+    cardAvatar.className = 'card-avatar';
+    cardAvatar.style.background = char.bg;
+    cardAvatar.style.boxShadow = `0 0 8px ${char.color}30`;
+    cardAvatar.appendChild(makeSprite(char, 0, 32));
+    card.appendChild(cardAvatar);
+
+    const cardName = document.createElement('div');
+    cardName.className = 'card-name';
+    cardName.style.color = char.color;
+    cardName.textContent = char.name;
+    card.appendChild(cardName);
+
+    const cardRole = document.createElement('div');
+    cardRole.className = 'card-role';
+    cardRole.textContent = char.roleLabel;
+    card.appendChild(cardRole);
 
     card.addEventListener('dragstart', e => {
       if (onStage) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', char.id);
       e.dataTransfer.effectAllowed = 'move';
       const ghost = document.getElementById('drag-ghost');
-      ghost.querySelector('.ghost-avatar').innerHTML = char.emoji;
-      ghost.querySelector('.ghost-avatar').style.background = char.bg;
-      ghost.querySelector('.ghost-avatar').style.boxShadow = `0 0 30px ${char.color}60`;
+      const ghostAvatar = ghost.querySelector('.ghost-avatar');
+      ghostAvatar.innerHTML = '';
+      ghostAvatar.style.background = char.bg;
+      ghostAvatar.style.boxShadow = `0 0 30px ${char.color}60`;
+      ghostAvatar.appendChild(makeSprite(char, getEvoLevel(char.id), 56));
       const img = new Image();
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
       e.dataTransfer.setDragImage(img, 0, 0);
@@ -1635,12 +2223,91 @@ function renderCharacterBar() {
       const emptySlot = stageSlots.indexOf(null);
       if (emptySlot !== -1) { addToStage(char.id, emptySlot); if (!isPlaying) startPlayback(); }
     });
-    card.querySelector('.card-info').addEventListener('click', e => { e.stopPropagation(); openLoreCard(char); });
+    infoBtn.addEventListener('click', e => { e.stopPropagation(); openLoreCard(char); });
     bar.appendChild(card);
   });
 }
 
 let selectedChar = null;
+
+// ===================================================================
+// CATALYST SYSTEM
+// ===================================================================
+function renderCatalystBar() {
+  const bar = document.getElementById('catalyst-bar');
+  bar.innerHTML = '';
+  CATALYSTS.forEach(cat => {
+    const card = document.createElement('div');
+    card.className = 'catalyst-card' + (activeCatalyst?.id === cat.id ? ' active' : '');
+    card.style.setProperty('--cat-color', cat.color);
+    if (activeCatalyst?.id === cat.id) {
+      card.style.borderColor = cat.color;
+      card.style.background = `radial-gradient(circle at center, ${cat.color}18, rgba(20,5,40,0.6))`;
+    }
+
+    const avatar = document.createElement('div');
+    avatar.className = 'cat-avatar';
+    avatar.style.background = cat.bg;
+    avatar.style.boxShadow = activeCatalyst?.id === cat.id ? `0 0 14px ${cat.color}80` : `0 0 6px ${cat.color}20`;
+    avatar.appendChild(makeSprite(cat, 0, 32));
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cat-name';
+    nameEl.style.color = cat.color;
+    nameEl.textContent = cat.name;
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'cat-label';
+    labelEl.textContent = cat.effectLabel;
+
+    card.appendChild(avatar);
+    card.appendChild(nameEl);
+    card.appendChild(labelEl);
+    card.addEventListener('click', () => {
+      activeCatalyst?.id === cat.id ? deactivateCatalyst() : activateCatalyst(cat);
+    });
+    bar.appendChild(card);
+  });
+}
+
+function activateCatalyst(cat) {
+  const wasWild = activeCatalyst?.moodMods?.tempoMult > 1;
+  activeCatalyst = cat;
+  catalystTempoMult = cat.moodMods.tempoMult ?? 1;
+
+  document.getElementById('app').className = cat.cssClass;
+
+  const banner = document.getElementById('catalyst-active-banner');
+  banner.textContent = `✦ ${cat.effectLabel} ✦`;
+  banner.style.color = cat.color;
+  banner.style.background = `${cat.color}18`;
+  banner.style.border = `1px solid ${cat.color}40`;
+  banner.classList.add('visible');
+
+  const needsRestart = isPlaying && (cat.moodMods.tempoMult > 1 || wasWild);
+  if (needsRestart) { stopPlayback(); startPlayback(); }
+
+  if (reverbSend) reverbSend.gain.setTargetAtTime(0.25 + (cat.moodMods.reverbWetAdd ?? 0), ctx.currentTime, 0.5);
+
+  renderCatalystBar();
+  showToast(`${cat.name} activated — stage is now ${cat.effectLabel}!`);
+}
+
+function deactivateCatalyst() {
+  const wasWild = activeCatalyst?.moodMods?.tempoMult > 1;
+  activeCatalyst = null;
+  catalystTempoMult = 1;
+
+  document.getElementById('app').className = '';
+
+  document.getElementById('catalyst-active-banner').classList.remove('visible');
+
+  if (isPlaying && wasWild) { stopPlayback(); startPlayback(); }
+  if (reverbSend) reverbSend.gain.setTargetAtTime(0.25, ctx.currentTime, 0.5);
+
+  renderCatalystBar();
+  showToast('Catalyst removed — back to normal.');
+}
 
 function renderStepDisplay() {
   const c = document.getElementById('step-display'); c.innerHTML = '';
@@ -1720,9 +2387,11 @@ function openLoreCard(char) {
   const card = modal.querySelector('.lore-card');
   const evo = getEvoLevel(char.id);
   card.style.setProperty('--lore-color', char.color);
-  document.getElementById('lore-avatar').innerHTML = char.emoji;
-  document.getElementById('lore-avatar').style.background = char.bg;
-  document.getElementById('lore-avatar').style.boxShadow = `0 0 30px ${char.color}50`;
+  const loreAvatarEl = document.getElementById('lore-avatar');
+  loreAvatarEl.innerHTML = '';
+  loreAvatarEl.style.background = char.bg;
+  loreAvatarEl.style.boxShadow = `0 0 30px ${char.color}50`;
+  loreAvatarEl.appendChild(makeSprite(char, evo, 72));
   document.getElementById('lore-name').textContent = char.name;
   document.getElementById('lore-name').style.color = char.color;
   document.getElementById('lore-title').textContent = char.title + ' · ' + char.roleLabel + (char.phase === 3 ? ' · Phase 3' : '');
@@ -1743,7 +2412,12 @@ function openLoreCard(char) {
       if (!ac) return;
       const div = document.createElement('div');
       div.className = 'lore-rel';
-      div.innerHTML = `<span class="rel-emoji">${ac.emoji}</span> ${ac.name} — ${ally.reason}`;
+      const relSprite = makeSprite(ac, 0, 20);
+      relSprite.style.borderRadius = '4px';
+      relSprite.style.verticalAlign = 'middle';
+      relSprite.style.marginRight = '4px';
+      div.appendChild(relSprite);
+      div.appendChild(document.createTextNode(`${ac.name} — ${ally.reason}`));
       relsC.appendChild(div);
     });
   }
@@ -1819,6 +2493,7 @@ function init() {
   renderStepDisplay();
   renderStage();
   renderCharacterBar();
+  renderCatalystBar();
   setupControls();
 
   document.getElementById('start-screen').addEventListener('click', () => {
