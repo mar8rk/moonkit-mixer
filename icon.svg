@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#1a0038"/>
+      <stop offset="100%" stop-color="#06000f"/>
+    </radialGradient>
+    <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe799" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#ffe799" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="purpleGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#b14eff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#b14eff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- Purple atmospheric glow bottom -->
+  <ellipse cx="256" cy="460" rx="200" ry="80" fill="url(#purpleGlow)"/>
+
+  <!-- Moon halo -->
+  <circle cx="220" cy="185" r="110" fill="url(#moonGlow)"/>
+
+  <!-- Stars -->
+  <circle cx="380" cy="90"  r="2.5" fill="white" opacity="0.9"/>
+  <circle cx="410" cy="160" r="1.8" fill="white" opacity="0.6"/>
+  <circle cx="440" cy="110" r="3"   fill="white" opacity="0.7" filter="url(#softGlow)"/>
+  <circle cx="130" cy="100" r="2"   fill="white" opacity="0.8"/>
+  <circle cx="100" cy="170" r="1.5" fill="white" opacity="0.5"/>
+  <circle cx="460" cy="240" r="2"   fill="white" opacity="0.6"/>
+  <circle cx="80"  cy="290" r="1.8" fill="white" opacity="0.4"/>
+  <circle cx="420" cy="330" r="2.5" fill="white" opacity="0.5"/>
+  <circle cx="160" cy="380" r="1.5" fill="white" opacity="0.4"/>
+  <circle cx="350" cy="420" r="2"   fill="white" opacity="0.35"/>
+
+  <!-- Moon body -->
+  <circle cx="220" cy="185" r="90" fill="#fffde8" filter="url(#softGlow)"/>
+  <!-- Crescent cutout -->
+  <circle cx="258" cy="168" r="78" fill="#0d0022"/>
+
+  <!-- Tiny stars on moon face -->
+  <circle cx="195" cy="200" r="3" fill="#ffe799" opacity="0.5"/>
+  <circle cx="175" cy="175" r="2" fill="#ffe799" opacity="0.4"/>
+
+  <!-- Pink accent glow from bottom-left -->
+  <ellipse cx="180" cy="460" rx="140" ry="60" fill="#ff4ecb" opacity="0.07"/>
+
+  <!-- Subtle "M" lettermark hint — three dots -->
+  <circle cx="220" cy="380" r="8" fill="#b14eff" opacity="0.6"/>
+  <circle cx="256" cy="365" r="8" fill="#ff4ecb" opacity="0.6"/>
+  <circle cx="292" cy="380" r="8" fill="#00e5ff" opacity="0.6"/>
+</svg>

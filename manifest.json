@@ -1,0 +1,26 @@
+{
+  "name": "Moonkit Mixer",
+  "short_name": "Moonkit",
+  "description": "A cute-creepy music playground — drag creatures onto the stage and build your jam.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#06000f",
+  "theme_color": "#b14eff",
+  "orientation": "any",
+  "categories": ["games", "music"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

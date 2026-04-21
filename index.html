@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moonkit Mixer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#b14eff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Moonkit">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="description" content="A cute-creepy music playground — drag creatures onto the stage and build your jam.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Quicksand:wght@400;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #06000f;
+    --bg-mid: #0f0024;
+    --bg-light: #1a0038;
+    --glow-purple: #b14eff;
+    --glow-pink: #ff4ecb;
+    --glow-cyan: #00e5ff;
+    --text-primary: #e8d5ff;
+    --text-muted: #8a6faa;
+    --slot-empty: rgba(120, 70, 180, 0.15);
+    --slot-border: rgba(140, 80, 200, 0.3);
+  }
+
+  body {
+    font-family: 'Fredoka', 'Quicksand', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ===== STARFIELD ===== */
+  #starfield {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  .star {
+    position: absolute; border-radius: 50%; background: white;
+    animation: twinkle var(--dur) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    0% { opacity: var(--min-o); transform: scale(1); }
+    100% { opacity: var(--max-o); transform: scale(1.3); }
+  }
+
+  /* ===== MOON ===== */
+  #moon {
+    position: fixed; top: 30px; right: 60px;
+    width: 80px; height: 80px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fffde8, #ffe799);
+    box-shadow: 0 0 40px rgba(255, 230, 100, 0.3), 0 0 80px rgba(255, 230, 100, 0.15);
+    z-index: 1; pointer-events: none;
+    transition: box-shadow 1s ease;
+  }
+  #moon::after {
+    content: ''; position: absolute; top: 5px; right: 5px;
+    width: 55px; height: 55px; border-radius: 50%;
+    background: var(--bg-deep); opacity: 0.85;
+  }
+  #moon.bright {
+    box-shadow: 0 0 60px rgba(255, 230, 100, 0.5), 0 0 120px rgba(255, 230, 100, 0.25);
+  }
+
+  /* ===== START SCREEN ===== */
+  #start-screen {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #1a0038 0%, #06000f 70%);
+    cursor: pointer;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+  }
+  #start-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  #start-screen h1 {
+    font-size: 4rem; font-weight: 700;
+    background: linear-gradient(135deg, #ff4ecb, #b14eff, #00e5ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 12px;
+    animation: titlePulse 3s ease-in-out infinite;
+  }
+  #start-screen p { font-size: 1.2rem; color: var(--text-muted); animation: fadeInUp 1.5s ease-out 0.3s both; }
+  #start-screen .start-emoji { font-size: 5rem; margin-bottom: 20px; animation: floatBounce 3s ease-in-out infinite; }
+  #start-screen .shortcuts { position: absolute; bottom: 30px; font-size: 0.75rem; color: rgba(138, 111, 170, 0.5); text-align: center; }
+  #start-screen .version-tag { font-size: 0.7rem; color: rgba(138,111,170,0.6); margin-top: 6px; }
+  @keyframes titlePulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+  @keyframes floatBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ===== APP LAYOUT ===== */
+  #app {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 16px 20px 30px; gap: 12px;
+  }
+
+  /* ===== HEADER ===== */
+  header { text-align: center; padding: 6px 0; }
+  header h1 {
+    font-size: 1.8rem; font-weight: 700;
+    background: linear-gradient(135deg, #ff4ecb, #b14eff, #00e5ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header p { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* ===== STAGE ===== */
+  #stage-container { width: 100%; max-width: 780px; }
+  #stage {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px; padding: 20px;
+    background: radial-gradient(ellipse at center, rgba(80, 30, 140, 0.12) 0%, transparent 70%);
+    border-radius: 24px;
+    border: 1px solid rgba(120, 70, 200, 0.1);
+  }
+
+  .stage-slot {
+    aspect-ratio: 1; border-radius: 20px;
+    border: 2px dashed var(--slot-border);
+    background: var(--slot-empty);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: pointer; min-height: 100px;
+    overflow: hidden;
+  }
+  .stage-slot:hover:not(.occupied) {
+    border-color: rgba(177, 78, 255, 0.5);
+    background: rgba(120, 70, 180, 0.25);
+  }
+  .stage-slot.drag-over {
+    border-color: var(--glow-purple) !important;
+    background: rgba(177, 78, 255, 0.2) !important;
+    box-shadow: 0 0 20px rgba(177, 78, 255, 0.3);
+    transform: scale(1.05);
+  }
+  .stage-slot.occupied { border-style: solid; cursor: pointer; }
+  .stage-slot .slot-number { font-size: 1.3rem; opacity: 0.12; font-weight: 700; }
+
+  /* Character on stage */
+  .stage-character {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    position: relative;
+  }
+  .stage-character .char-avatar {
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; position: relative;
+    transition: all 0.5s ease;
+  }
+  .stage-character .char-name {
+    font-size: 0.65rem; font-weight: 600;
+    text-align: center; white-space: nowrap;
+  }
+  .stage-character .char-role {
+    font-size: 0.5rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* ===== EVOLUTION VISUALS ===== */
+  .stage-character .evo-ring {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%; pointer-events: none;
+    opacity: 0; transition: all 0.8s ease;
+  }
+  .evo-1 .char-avatar { transform: scale(1.05); }
+  .evo-1 .evo-ring {
+    width: 66px; height: 66px; opacity: 1;
+    border: 2px solid var(--char-color);
+    box-shadow: 0 0 12px var(--char-color), inset 0 0 8px var(--char-color);
+    animation: evoRingSpin 6s linear infinite;
+  }
+  .evo-2 .char-avatar { transform: scale(1.12); filter: brightness(1.15); }
+  .evo-2 .evo-ring {
+    width: 72px; height: 72px; opacity: 1;
+    border: 2px solid var(--char-color);
+    box-shadow: 0 0 20px var(--char-color), 0 0 40px color-mix(in srgb, var(--char-color) 40%, transparent),
+                inset 0 0 12px var(--char-color);
+    animation: evoRingSpin 4s linear infinite;
+  }
+  .evo-2 .stage-character::before,
+  .evo-2 .stage-character::after {
+    content: ''; position: absolute; border-radius: 50%;
+    background: var(--char-color); opacity: 0.6;
+    animation: evoParticle 2s ease-in-out infinite;
+  }
+  .evo-2 .stage-character::before { width: 4px; height: 4px; top: 2px; right: 8px; animation-delay: 0s; }
+  .evo-2 .stage-character::after { width: 3px; height: 3px; bottom: 16px; left: 4px; animation-delay: 0.8s; }
+  .evo-3 .char-avatar { transform: scale(1.22); filter: brightness(1.25); }
+  .evo-3 .evo-ring {
+    width: 80px; height: 80px; opacity: 1;
+    border: 2px solid var(--char-color);
+    box-shadow: 0 0 30px var(--char-color), 0 0 60px color-mix(in srgb, var(--char-color) 50%, transparent),
+                0 0 90px color-mix(in srgb, var(--char-color) 25%, transparent),
+                inset 0 0 16px var(--char-color);
+    animation: evoRingSpin 3s linear infinite, evoPulse 1.5s ease-in-out infinite alternate;
+  }
+  .evo-3 .stage-character::before { width: 5px; height: 5px; top: -2px; right: 6px; animation: evoParticle 1.5s ease-in-out infinite; }
+  .evo-3 .stage-character::after { width: 4px; height: 4px; bottom: 14px; left: 2px; animation: evoParticle 1.8s ease-in-out infinite 0.5s; }
+  .evo-3 .evo-sparkle { position: absolute; border-radius: 50%; background: white; opacity: 0; animation: evoSparkle 2s ease-in-out infinite; }
+
+  @keyframes evoRingSpin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+  @keyframes evoPulse { from { opacity: 0.7; } to { opacity: 1; } }
+  @keyframes evoParticle { 0%, 100% { opacity: 0; transform: translateY(0) scale(0.5); } 50% { opacity: 0.8; transform: translateY(-12px) scale(1.2); } }
+  @keyframes evoSparkle { 0%, 100% { opacity: 0; transform: scale(0); } 30% { opacity: 1; transform: scale(1); } 70% { opacity: 0.6; transform: scale(0.8); } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.3); } to { opacity: 1; transform: scale(1); } }
+  @keyframes beatPulse { 0% { transform: scale(1); } 15% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .beat-flash .char-avatar { animation: beatPulse 0.2s ease-out; }
+
+  /* ===== STEP INDICATOR ===== */
+  #step-display { display: flex; gap: 5px; justify-content: center; padding: 4px 0; }
+  .step-dot {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: rgba(120, 70, 200, 0.2);
+    border: 1px solid rgba(120, 70, 200, 0.3);
+    transition: all 0.1s ease;
+  }
+  .step-dot.active { background: var(--glow-purple); box-shadow: 0 0 8px var(--glow-purple); border-color: var(--glow-purple); }
+  .step-dot.beat { border-color: rgba(180, 120, 255, 0.4); }
+
+  /* ===== V3: STEP SEQUENCER PANEL ===== */
+  #seq-panel {
+    width: 100%; max-width: 780px;
+    background: rgba(10, 0, 22, 0.7);
+    border: 1px solid rgba(120, 70, 200, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #seq-panel.open { max-height: 700px; }
+
+  .seq-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px 6px;
+    border-bottom: 1px solid rgba(120, 70, 200, 0.15);
+    gap: 8px;
+  }
+  .seq-title { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
+  .seq-ruler {
+    display: flex; flex: 1; margin-left: 84px; margin-right: 4px;
+  }
+  .seq-ruler-beat {
+    flex: 4; text-align: left; padding-left: 2px;
+    font-size: 0.55rem; color: rgba(138, 111, 170, 0.4);
+  }
+
+  .seq-empty {
+    padding: 14px; text-align: center;
+    font-size: 0.75rem; color: var(--text-muted);
+  }
+
+  .seq-row {
+    display: flex; align-items: center;
+    padding: 5px 14px; gap: 8px;
+    border-bottom: 1px solid rgba(120, 70, 200, 0.08);
+  }
+  .seq-row:last-child { border-bottom: none; }
+
+  .seq-label {
+    display: flex; align-items: center; gap: 5px;
+    min-width: 76px; max-width: 76px;
+  }
+  .seq-emoji { font-size: 1rem; line-height: 1; }
+  .seq-char-name { font-size: 0.58rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .seq-steps { display: flex; gap: 2px; flex: 1; }
+  .seq-step {
+    flex: 1; aspect-ratio: 1; border-radius: 4px;
+    border: 1px solid rgba(80, 40, 140, 0.3);
+    background: rgba(20, 5, 40, 0.5);
+    cursor: pointer; transition: background 0.08s, box-shadow 0.08s;
+    min-width: 0; padding: 0; outline: none;
+    position: relative;
+  }
+  .seq-step:hover { border-color: rgba(177, 78, 255, 0.55); background: rgba(120, 70, 200, 0.15); }
+  .seq-step.on { background: var(--step-color, #b14eff); border-color: transparent; }
+  .seq-step.playing { box-shadow: 0 0 0 2px rgba(255,255,255,0.85); transform: scale(1.2); z-index: 1; }
+  .seq-step.beat-mark { border-left: 1px solid rgba(140, 80, 200, 0.5); }
+
+  /* ===== CONTROLS ===== */
+  #controls {
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap; justify-content: center; padding: 4px 0;
+  }
+  #fx-row {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; justify-content: center; padding: 2px 0;
+  }
+  .control-group { display: flex; align-items: center; gap: 8px; }
+  .control-group label {
+    font-size: 0.7rem; color: var(--text-muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .control-group input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 90px; height: 6px; border-radius: 3px;
+    background: rgba(120, 70, 200, 0.3); outline: none;
+  }
+  .control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--glow-purple); cursor: pointer;
+    box-shadow: 0 0 6px rgba(177, 78, 255, 0.4);
+  }
+  .control-group .value-display { font-size: 0.75rem; min-width: 36px; color: var(--text-primary); font-weight: 600; }
+  .btn {
+    padding: 7px 14px; border-radius: 20px;
+    border: 1px solid rgba(120, 70, 200, 0.4);
+    background: rgba(120, 70, 200, 0.15);
+    color: var(--text-primary); font-family: inherit;
+    font-size: 0.75rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .btn:hover { background: rgba(177, 78, 255, 0.3); border-color: var(--glow-purple); box-shadow: 0 0 12px rgba(177, 78, 255, 0.2); }
+  .btn.active { background: rgba(177, 78, 255, 0.4); border-color: var(--glow-purple); }
+  .btn.lofi-active { background: rgba(255, 180, 50, 0.35); border-color: #f59e0b; color: #fcd34d; }
+  .btn.seq-active { background: rgba(0, 229, 255, 0.2); border-color: var(--glow-cyan); color: var(--glow-cyan); }
+
+  /* ===== MOOD SELECTOR ===== */
+  #mood-selector { display: flex; gap: 6px; align-items: center; }
+  #mood-selector label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-right: 4px; }
+  .mood-btn {
+    padding: 5px 12px; border-radius: 16px;
+    border: 1px solid rgba(120, 70, 200, 0.3);
+    background: rgba(120, 70, 200, 0.1);
+    color: var(--text-muted); font-family: inherit;
+    font-size: 0.7rem; font-weight: 600;
+    cursor: pointer; transition: all 0.3s ease;
+  }
+  .mood-btn:hover { border-color: rgba(177, 78, 255, 0.5); color: var(--text-primary); }
+  .mood-btn.active-mood {
+    border-color: var(--mood-color, var(--glow-purple)); color: var(--text-primary);
+    background: color-mix(in srgb, var(--mood-color, var(--glow-purple)) 25%, transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--mood-color, var(--glow-purple)) 30%, transparent);
+  }
+  .mood-btn[data-mood="dreamy"] { --mood-color: #b388ff; }
+  .mood-btn[data-mood="spooky"] { --mood-color: #7c4dff; }
+  .mood-btn[data-mood="wild"]   { --mood-color: #ff4081; }
+
+  /* ===== CHARACTER BAR ===== */
+  #char-bar-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+  #character-bar {
+    display: flex; gap: 10px;
+    justify-content: center; flex-wrap: wrap;
+    padding: 10px; max-width: 940px; width: 100%;
+  }
+  .char-card {
+    width: 82px; padding: 10px 6px; border-radius: 14px;
+    border: 2px solid rgba(120, 70, 200, 0.2);
+    background: rgba(20, 5, 40, 0.6);
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    cursor: grab; transition: all 0.25s ease;
+    position: relative;
+  }
+  .char-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--char-color, var(--glow-purple));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px color-mix(in srgb, var(--char-color, var(--glow-purple)) 30%, transparent);
+  }
+  .char-card:active { cursor: grabbing; }
+  .char-card.on-stage { opacity: 0.3; pointer-events: none; transform: scale(0.9); }
+  .char-card .card-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+  .char-card .card-name { font-size: 0.65rem; font-weight: 600; text-align: center; white-space: nowrap; }
+  .char-card .card-role { font-size: 0.5rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .char-card .card-info {
+    position: absolute; top: 3px; right: 5px;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: rgba(120, 70, 200, 0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.5rem; color: var(--text-muted); cursor: help;
+  }
+  .char-card .phase-badge {
+    position: absolute; top: 3px; left: 5px;
+    padding: 1px 4px; border-radius: 6px;
+    font-size: 0.45rem; font-weight: 700;
+    background: rgba(0, 229, 255, 0.15);
+    border: 1px solid rgba(0, 229, 255, 0.3);
+    color: var(--glow-cyan);
+  }
+
+  /* ===== DRAG GHOST ===== */
+  #drag-ghost { position: fixed; pointer-events: none; z-index: 9999; display: none; }
+  #drag-ghost .ghost-avatar {
+    width: 70px; height: 70px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.2rem;
+    box-shadow: 0 0 30px rgba(177, 78, 255, 0.4);
+    animation: ghostWiggle 0.4s ease-in-out infinite alternate;
+  }
+  @keyframes ghostWiggle { from { transform: rotate(-5deg) scale(1.05); } to { transform: rotate(5deg) scale(1.1); } }
+
+  /* ===== LORE CARD MODAL ===== */
+  #lore-modal {
+    position: fixed; inset: 0; z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(6, 0, 15, 0.85);
+    backdrop-filter: blur(12px);
+  }
+  #lore-modal.open { display: flex; animation: modalFadeIn 0.3s ease; }
+  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .lore-card {
+    width: 90%; max-width: 440px;
+    border-radius: 24px;
+    border: 1px solid rgba(120, 70, 200, 0.3);
+    background: linear-gradient(180deg, rgba(26, 0, 56, 0.95) 0%, rgba(6, 0, 15, 0.98) 100%);
+    overflow: hidden;
+    animation: loreSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px color-mix(in srgb, var(--lore-color) 20%, transparent);
+  }
+  @keyframes loreSlideUp { from { opacity: 0; transform: translateY(40px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .lore-header {
+    padding: 28px 24px 20px; text-align: center; position: relative;
+    background: radial-gradient(ellipse at center bottom, color-mix(in srgb, var(--lore-color) 15%, transparent) 0%, transparent 70%);
+  }
+  .lore-avatar { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; margin: 0 auto 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--lore-color) 40%, transparent); }
+  .lore-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 2px; }
+  .lore-title { font-size: 0.8rem; color: var(--text-muted); }
+  .lore-close { position: absolute; top: 12px; right: 14px; width: 28px; height: 28px; border-radius: 50%; background: rgba(120, 70, 200, 0.2); border: none; color: var(--text-muted); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .lore-close:hover { background: rgba(177, 78, 255, 0.3); color: var(--text-primary); }
+  .lore-body { padding: 0 24px 24px; }
+  .lore-section { margin-bottom: 16px; }
+  .lore-section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+  .lore-section p { font-size: 0.8rem; line-height: 1.6; color: #c4a8e0; }
+  .lore-evo-stages { display: flex; gap: 8px; }
+  .lore-evo-stage { flex: 1; padding: 8px; border-radius: 10px; background: rgba(120, 70, 200, 0.08); border: 1px solid rgba(120, 70, 200, 0.15); text-align: center; }
+  .lore-evo-stage .evo-label { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
+  .lore-evo-stage .evo-desc { font-size: 0.65rem; color: #c4a8e0; line-height: 1.3; }
+  .lore-evo-stage.current { border-color: var(--lore-color); background: color-mix(in srgb, var(--lore-color) 10%, transparent); }
+  .lore-relationships { display: flex; gap: 8px; flex-wrap: wrap; }
+  .lore-rel { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; background: rgba(120, 70, 200, 0.1); font-size: 0.7rem; color: #c4a8e0; }
+  .lore-rel .rel-emoji { font-size: 0.9rem; }
+
+  /* ===== V3: TOAST ===== */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(60, 20, 100, 0.95);
+    border: 1px solid rgba(177, 78, 255, 0.6);
+    color: var(--text-primary); padding: 10px 22px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 600;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none; z-index: 3000;
+    box-shadow: 0 0 20px rgba(177, 78, 255, 0.3);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ===== REMOVE HINT ===== */
+  .stage-slot.occupied:hover .stage-character .char-avatar::after {
+    content: '\00D7'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; color: white;
+    background: rgba(0,0,0,0.5); border-radius: 50%; z-index: 5;
+  }
+
+  .is-playing #stage { border-color: rgba(177, 78, 255, 0.15); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 700px) {
+    #start-screen h1 { font-size: 2.5rem; }
+    header h1 { font-size: 1.4rem; }
+    #stage { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; }
+    .stage-slot { min-height: 75px; border-radius: 14px; }
+    .stage-character .char-avatar { width: 40px; height: 40px; font-size: 1.3rem; }
+    .char-card { width: 72px; padding: 8px 5px; }
+    .char-card .card-avatar { width: 38px; height: 38px; font-size: 1.2rem; }
+    #controls { gap: 10px; }
+    .control-group input[type="range"] { width: 60px; }
+    .lore-card { max-width: 340px; }
+    #seq-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start-screen">
+  <div class="start-emoji">🌙</div>
+  <h1>Moonkit Mixer</h1>
+  <p>click anywhere to start jamming</p>
+  <div class="version-tag">v3 — 16 creatures · step sequencer · reverb · share</div>
+  <div class="shortcuts">Space = play/stop · S = shuffle · C = clear · M = mood · R = reverb · L = lo-fi · Q = sequencer</div>
+</div>
+
+<!-- STARFIELD + MOON -->
+<div id="starfield"></div>
+<div id="moon"></div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <h1>🌙 Moonkit Mixer <span style="font-size:0.6em;color:var(--text-muted)">v3</span></h1>
+    <p>drag creatures onto the stage · click ? for lore · click creatures to remove</p>
+  </header>
+
+  <div id="stage-container"><div id="stage"></div></div>
+  <div id="step-display"></div>
+
+  <!-- STEP SEQUENCER PANEL -->
+  <div id="seq-panel">
+    <div class="seq-header">
+      <span class="seq-title">Step Sequencer — click steps to toggle</span>
+      <div class="seq-ruler" id="seq-ruler">
+        <span class="seq-ruler-beat">1</span>
+        <span class="seq-ruler-beat">2</span>
+        <span class="seq-ruler-beat">3</span>
+        <span class="seq-ruler-beat">4</span>
+      </div>
+    </div>
+    <div id="seq-rows"><div class="seq-empty">Add creatures to the stage to edit their patterns</div></div>
+  </div>
+
+  <!-- MAIN CONTROLS -->
+  <div id="controls">
+    <div class="control-group">
+      <label>Tempo</label>
+      <input type="range" id="tempo" min="60" max="160" value="105">
+      <span class="value-display" id="tempo-val">105</span>
+    </div>
+    <div class="control-group">
+      <label>Vol</label>
+      <input type="range" id="volume" min="0" max="100" value="75">
+      <span class="value-display" id="volume-val">75</span>
+    </div>
+    <div id="mood-selector">
+      <label>Mood</label>
+      <button class="mood-btn active-mood" data-mood="dreamy">Dreamy</button>
+      <button class="mood-btn" data-mood="spooky">Spooky</button>
+      <button class="mood-btn" data-mood="wild">Wild</button>
+    </div>
+    <button class="btn" id="btn-play">&#9654; Play</button>
+    <button class="btn" id="btn-shuffle">&#127922; Shuffle</button>
+    <button class="btn" id="btn-clear">&#10005; Clear</button>
+  </div>
+
+  <!-- FX + UTILITY ROW -->
+  <div id="fx-row">
+    <div class="control-group">
+      <label>Reverb</label>
+      <input type="range" id="reverb" min="0" max="100" value="25">
+      <span class="value-display" id="reverb-val">25%</span>
+    </div>
+    <button class="btn" id="btn-lofi">Lo&#8209;Fi</button>
+    <button class="btn" id="btn-seq">&#9633; Seq</button>
+    <button class="btn" id="btn-share">&#8599; Share</button>
+  </div>
+
+  <div id="char-bar-label">~ your creatures ~</div>
+  <div id="character-bar"></div>
+</div>
+
+<!-- DRAG GHOST -->
+<div id="drag-ghost"><div class="ghost-avatar"></div></div>
+
+<!-- LORE CARD MODAL -->
+<div id="lore-modal">
+  <div class="lore-card">
+    <div class="lore-header">
+      <button class="lore-close" id="lore-close">&times;</button>
+      <div class="lore-avatar" id="lore-avatar"></div>
+      <div class="lore-name" id="lore-name"></div>
+      <div class="lore-title" id="lore-title"></div>
+    </div>
+    <div class="lore-body">
+      <div class="lore-section"><div class="lore-section-title">Origin</div><p id="lore-origin"></p></div>
+      <div class="lore-section"><div class="lore-section-title">Evolution</div><div class="lore-evo-stages" id="lore-evo"></div></div>
+      <div class="lore-section"><div class="lore-section-title">Allies</div><div class="lore-relationships" id="lore-rels"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">🌙 Link copied!</div>
+
+<script>
+// ===================================================================
+// CHARACTER DEFINITIONS — 16 creatures (Phase 1+2+3)
+// ===================================================================
+const CHARACTERS = [
+  // ── Phase 1 ──
+  {
+    id: 'cracklecorn', name: 'Cracklecorn', emoji: '🦄',
+    evoEmoji: ['🦄','🦄','🦄','🌩️'],
+    title: 'Static Unicorn', role: 'kick', roleLabel: 'KICK',
+    color: '#ff1493', bg: 'radial-gradient(circle at 35% 35%, #4a0e2e, #2a0018)',
+    description: 'Born in a lightning storm at the candy factory. Her horn crackles with electricity and every stomp shakes the ground.',
+    evoStages: ['Young spark','Charged hooves','Lightning mane','Storm incarnate'],
+    allies: [{id:'thump',reason:'Best rhythm buddy'},{id:'bloop',reason:'Low-end partner'}],
+    patterns: [
+      [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0],
+      [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      [1,0,1,0, 0,0,1,0, 1,0,0,0, 1,0,0,0],
+      [1,0,0,0, 1,0,0,0, 1,0,0,1, 0,0,1,0],
+    ],
+  },
+  {
+    id: 'thump', name: 'Thump', emoji: '🐻',
+    evoEmoji: ['🐻','🐻','🧸','💀'],
+    title: 'Skeleton Bear', role: 'snare', roleLabel: 'SNARE',
+    color: '#f0e6d2', bg: 'radial-gradient(circle at 35% 35%, #3d2b1a, #1a0f05)',
+    description: 'A tiny bear made of moonlit bones. His claps echo through haunted forests and make the trees shiver.',
+    evoStages: ['Shy paws','Bone rattle','Ghost clap','Phantom thunder'],
+    allies: [{id:'cracklecorn',reason:'Lock-tight groove'},{id:'skritches',reason:'Rhythm section'}],
+    patterns: [
+      [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+      [0,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,1,0],
+      [0,0,0,0, 1,0,0,0, 0,1,0,0, 1,0,0,1],
+    ],
+  },
+  {
+    id: 'skritches', name: 'Skritches', emoji: '🐰',
+    evoEmoji: ['🐰','🐰','🦇','🦇'],
+    title: 'Bat Bunny', role: 'hihat', roleLabel: 'HI-HAT',
+    color: '#c0c0c0', bg: 'radial-gradient(circle at 35% 35%, #2a2a3a, #0e0e18)',
+    description: 'Half bunny, half bat, all mischief. Her oversized ears pick up every whisper and she taps out rhythms with tiny silver claws.',
+    evoStages: ['Silver whisper','Quick tap','Sonar pulse','Echolocation frenzy'],
+    allies: [{id:'thump',reason:'Rhythm partners'},{id:'clickette',reason:'Percussion duo'}],
+    patterns: [
+      [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,1,1],
+      [1,0,1,1, 1,0,1,0, 1,1,1,0, 1,0,1,1],
+    ],
+  },
+  {
+    id: 'bloop', name: 'Bloop', emoji: '🪼',
+    evoEmoji: ['🪼','🪼','🌊','🌀'],
+    title: 'Ghost Jellyfish', role: 'bass', roleLabel: 'BASS',
+    color: '#00e5ff', bg: 'radial-gradient(circle at 35% 35%, #0a2a3a, #020e14)',
+    description: 'Floats through walls humming deep notes that make your chest vibrate. Nobody knows if Bloop is alive, dead, or somewhere in between.',
+    evoStages: ['Deep hum','Tentacle pulse','Abyssal drone','Leviathan resonance'],
+    allies: [{id:'cracklecorn',reason:'Foundation duo'},{id:'rumble',reason:'Sub bass brothers'}],
+    patterns: [
+      [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      [1,0,0,1, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+      [1,0,1,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+      [1,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,1],
+    ],
+    notes: [65.41, 77.78, 87.31, 98.00, 65.41, 77.78, 98.00, 65.41, 87.31, 65.41, 77.78, 98.00, 65.41, 87.31, 77.78, 65.41],
+  },
+  {
+    id: 'glimmer', name: 'Glimmer', emoji: '🕷️',
+    evoEmoji: ['🕷️','🕷️','🕸️','✨'],
+    title: 'Crystal Spider', role: 'melody', roleLabel: 'MELODY',
+    color: '#ffd700', bg: 'radial-gradient(circle at 35% 35%, #3a2a00, #1a1200)',
+    description: 'Weaves webs of pure sound that shimmer like gold in moonlight. Each strand plays a different note when the wind blows through.',
+    evoStages: ['Single thread','Web pattern','Golden lattice','Prismatic symphony'],
+    allies: [{id:'zephyr',reason:'Melodic sisters'},{id:'lunara',reason:'Harmony weaver'}],
+    patterns: [
+      [1,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0],
+      [0,0,1,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+      [1,0,0,1, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+      [0,0,1,0, 1,0,0,0, 1,0,0,1, 0,0,0,0],
+    ],
+    notes: [523.25, 466.16, 392.00, 349.23, 311.13, 261.63, 311.13, 349.23, 392.00, 523.25, 466.16, 349.23, 261.63, 311.13, 392.00, 523.25],
+  },
+  {
+    id: 'lunara', name: 'Lunara', emoji: '🐱',
+    evoEmoji: ['🐱','🐱','😺','🌟'],
+    title: 'Moon Kitten', role: 'pad', roleLabel: 'PAD',
+    color: '#b14eff', bg: 'radial-gradient(circle at 35% 35%, #2c1654, #120a28)',
+    description: 'Born with three eyes that see in three different dimensions. Her purr is a chord that resonates across the astral plane.',
+    evoStages: ['Soft purr','Astral hum','Dimensional chord','Cosmic resonance'],
+    allies: [{id:'whispurr',reason:'Shadow & light twins'},{id:'glimmer',reason:'Harmonic bliss'}],
+    patterns: [
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    ],
+  },
+  {
+    id: 'mosswick', name: 'Mosswick', emoji: '🍄',
+    evoEmoji: ['🍄','🍄','🌿','💫'],
+    title: 'Spore Sprite', role: 'fx', roleLabel: 'FX',
+    color: '#2ecc71', bg: 'radial-gradient(circle at 35% 35%, #0a2a14, #041208)',
+    description: 'A tiny mushroom creature that releases musical spores when surprised. Each spore pops with a different otherworldly tone.',
+    evoStages: ['Single spore','Spore cloud','Mycelium song','Forest network'],
+    allies: [{id:'echomaw',reason:'Strange sounds club'},{id:'whispurr',reason:'Texture friends'}],
+    patterns: [
+      [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+      [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0],
+      [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      [0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+    ],
+  },
+  {
+    id: 'whispurr', name: 'Whispurr', emoji: '🐈‍⬛',
+    evoEmoji: ['🐈‍⬛','🐈‍⬛','👁️','🌑'],
+    title: 'Shadow Cat', role: 'ambient', roleLabel: 'AMBIENT',
+    color: '#8e44ad', bg: 'radial-gradient(circle at 35% 35%, #1a0a2e, #0a0418)',
+    description: 'Appears only at twilight, trailing wisps of dark mist. Her whisper fills the silence between sounds with something eerie and beautiful.',
+    evoStages: ['Faint shadow','Dark whisper','Void murmur','Eclipse breath'],
+    allies: [{id:'lunara',reason:'Yin to her yang'},{id:'mosswick',reason:'Texture duo'}],
+    patterns: [
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    ],
+  },
+  // ── Phase 2 ──
+  {
+    id: 'clickette', name: 'Clickette', emoji: '🦎',
+    evoEmoji: ['🦎','🦎','🌈','🔮'],
+    title: 'Prismatic Gecko', role: 'clap', roleLabel: 'CLAP',
+    color: '#ff6b6b', bg: 'radial-gradient(circle at 35% 35%, #4a1a1a, #2a0808)',
+    description: 'Changes color with every clap. Found sleeping inside a prism, she woke up refracting sound into shimmering percussive rainbows.',
+    evoStages: ['Tiny click','Sharp snap','Prismatic clap','Rainbow shatter'],
+    allies: [{id:'thump',reason:'Snap & crack duo'},{id:'skritches',reason:'Percussion trio'}],
+    patterns: [
+      [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+      [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+      [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,1,0],
+      [0,1,0,0, 0,0,1,0, 0,1,0,0, 0,0,1,0],
+    ],
+  },
+  {
+    id: 'zephyr', name: 'Zephyr', emoji: '🦋',
+    evoEmoji: ['🦋','🦋','🦋','🪽'],
+    title: 'Dream Moth', role: 'arp', roleLabel: 'ARP',
+    color: '#e879f9', bg: 'radial-gradient(circle at 35% 35%, #3a1048, #1a0828)',
+    description: 'Drifts through dreams collecting melodies she finds there. Her wings scatter rapid cascades of notes like falling stars.',
+    evoStages: ['Gentle flutter','Note cascade','Dream spiral','Astral waterfall'],
+    allies: [{id:'glimmer',reason:'Melodic twins'},{id:'lunara',reason:'Dreamscape duo'}],
+    patterns: [
+      [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+      [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      [1,0,1,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    ],
+    notes: [261.63, 311.13, 349.23, 392.00, 466.16, 523.25, 466.16, 392.00, 349.23, 311.13, 261.63, 311.13, 392.00, 466.16, 523.25, 392.00],
+  },
+  {
+    id: 'echomaw', name: 'Echomaw', emoji: '🐸',
+    evoEmoji: ['🐸','🐸','👄','🌀'],
+    title: 'Void Toad', role: 'vocal', roleLabel: 'VOCAL',
+    color: '#a3e635', bg: 'radial-gradient(circle at 35% 35%, #1a2e0a, #0a1604)',
+    description: 'Sits on the edge of a bottomless pit and sings into it. What comes back is never quite the same sound, but always hauntingly beautiful.',
+    evoStages: ['Soft croak','Echo call','Harmonic yawn','Void chorus'],
+    allies: [{id:'mosswick',reason:'Weird sounds alliance'},{id:'whispurr',reason:'Eerie together'}],
+    patterns: [
+      [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+      [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0],
+    ],
+  },
+  {
+    id: 'rumble', name: 'Rumble', emoji: '🐢',
+    evoEmoji: ['🐢','🐢','🪨','🌋'],
+    title: 'Stone Tortoise', role: 'sub', roleLabel: 'SUB',
+    color: '#78716c', bg: 'radial-gradient(circle at 35% 35%, #2a2620, #141210)',
+    description: 'Ten thousand years old and still humming. Rumble moves so slowly that the ground vibrates in sympathy — a living subwoofer.',
+    evoStages: ['Faint tremor','Deep rumble','Tectonic pulse','Earthquake drone'],
+    allies: [{id:'bloop',reason:'Sub-bass siblings'},{id:'cracklecorn',reason:'Earth & lightning'}],
+    patterns: [
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    ],
+    notes: [32.70, 36.71, 41.20, 43.65, 49.00, 32.70, 36.71, 43.65, 32.70, 41.20, 36.71, 49.00, 32.70, 43.65, 41.20, 36.71],
+  },
+  // ── Phase 3 ──
+  {
+    id: 'corveth', name: 'Corveth', emoji: '🐦‍⬛',
+    evoEmoji: ['🐦‍⬛','🐦‍⬛','🪶','✦'],
+    title: 'Void Raven', role: 'pluck', roleLabel: 'PLUCK',
+    color: '#4f86c6', bg: 'radial-gradient(circle at 35% 35%, #0a1a3a, #040e20)',
+    description: 'A raven woven from compressed starlight. Each tap of its crystalline beak on hollow moonbones sounds a perfectly tuned pluck that lingers for seconds.',
+    evoStages: ['Single pick','Resonant tap','Harmonic flutter','Crystal bone choir'],
+    allies: [{id:'glimmer',reason:'Melodic counterparts'},{id:'zephyr',reason:'Sky creatures'}],
+    patterns: [
+      [0,0,0,1, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+      [0,0,0,0, 1,0,0,0, 0,0,0,1, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,1],
+      [0,0,1,0, 0,0,0,1, 0,0,0,0, 1,0,0,0],
+    ],
+    notes: [523.25, 466.16, 392.00, 349.23, 311.13, 392.00, 466.16, 523.25, 349.23, 311.13, 392.00, 466.16, 523.25, 392.00, 349.23, 311.13],
+    phase: 3,
+  },
+  {
+    id: 'flicker', name: 'Flicker', emoji: '🪲',
+    evoEmoji: ['🪲','🪲','✨','💎'],
+    title: 'Glow Beetle', role: 'chord', roleLabel: 'CHORD',
+    color: '#f59e0b', bg: 'radial-gradient(circle at 35% 35%, #3a2a00, #1a1000)',
+    description: 'A bioluminescent beetle found sleeping inside a hollow log, humming polyphonically. Flashes in Cm chords when excited, startled, or just feeling it.',
+    evoStages: ['Single flash','Double stab','Chord burst','Harmonic bloom'],
+    allies: [{id:'bloop',reason:'Low + mid harmony'},{id:'lunara',reason:'Spectral siblings'}],
+    patterns: [
+      [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+      [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+      [0,0,1,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
+      [0,1,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    ],
+    phase: 3,
+  },
+  {
+    id: 'murk', name: 'Murk', emoji: '🐊',
+    evoEmoji: ['🐊','🐊','🌿','🌑'],
+    title: 'Shadow Gator', role: 'growl', roleLabel: 'GROWL',
+    color: '#059669', bg: 'radial-gradient(circle at 35% 35%, #012918, #000f0a)',
+    description: "An ancient gator made of compressed swamp-shadow who hasn't moved since the last ice age. Her growl rolls through mud and makes stones hum in sympathy.",
+    evoStages: ['Swamp murmur','Throat rumble','Gator growl','Swamp thunder'],
+    allies: [{id:'rumble',reason:'Subsonic floor duo'},{id:'cracklecorn',reason:'Earth & lightning'}],
+    patterns: [
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
+      [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,1],
+    ],
+    notes: [41.20, 43.65, 49.00, 41.20, 36.71, 41.20, 43.65, 49.00, 41.20, 43.65, 36.71, 41.20, 49.00, 41.20, 43.65, 36.71],
+    phase: 3,
+  },
+  {
+    id: 'nimbus', name: 'Nimbus', emoji: '⛈️',
+    evoEmoji: ['⛈️','🌩️','🌤️','🔔'],
+    title: 'Storm Cloud', role: 'bell', roleLabel: 'BELL',
+    color: '#7dd3fc', bg: 'radial-gradient(circle at 35% 35%, #0a1e3a, #040a1a)',
+    description: 'A tiny storm cloud that rings like crystal when lightning passes through. Drops bell tones from impossible heights. Each tone lasts longer than the last.',
+    evoStages: ['Raindrop ping','Bell toll','Storm chime','Thunder bell choir'],
+    allies: [{id:'lunara',reason:'Sky melody pair'},{id:'zephyr',reason:'Atmospheric duo'}],
+    patterns: [
+      [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+      [0,0,0,0, 0,1,0,0, 0,0,0,0, 0,0,0,0],
+      [0,0,0,0, 1,0,0,0, 0,0,0,0, 0,1,0,0],
+    ],
+    notes: [1046.50, 987.77, 880.00, 783.99, 698.46, 783.99, 880.00, 987.77, 1046.50, 880.00, 783.99, 698.46, 1046.50, 987.77, 880.00, 783.99],
+    phase: 3,
+  },
+];
+
+// ===================================================================
+// MOOD SYSTEM
+// ===================================================================
+let currentMood = 'dreamy';
+const MOODS = {
+  dreamy: { filterMult: 0.7, detuneMult: 1.5, decayMult: 1.3, pitchShift: 0,     reverbWet: 0.3, label: 'Dreamy' },
+  spooky: { filterMult: 0.4, detuneMult: 2.5, decayMult: 1.6, pitchShift: -0.05, reverbWet: 0.5, label: 'Spooky' },
+  wild:   { filterMult: 1.6, detuneMult: 0.6, decayMult: 0.65, pitchShift: 0.02, reverbWet: 0.15,label: 'Wild'   },
+};
+function mood() { return MOODS[currentMood]; }
+
+// ===================================================================
+// AUDIO ENGINE
+// ===================================================================
+let ctx = null;
+let masterGain = null;
+let compressor = null;
+let delayNode = null;
+let delayFeedback = null;
+let delayWet = null;
+let noiseBuffer = null;
+let reverbNode = null;
+let reverbSend = null;
+let lofiFilter = null;
+let lofiActive = false;
+
+function buildReverbBuffer() {
+  const len = ctx.sampleRate * 2.8;
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8);
+    }
+  }
+  return buf;
+}
+
+function initAudio() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Dynamics
+  compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -14;
+  compressor.knee.value = 10;
+  compressor.ratio.value = 5;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.1;
+
+  masterGain = ctx.createGain();
+  masterGain.gain.value = 0.75;
+
+  // Delay send
+  delayNode = ctx.createDelay(1.0);
+  delayNode.delayTime.value = 0.33;
+  delayFeedback = ctx.createGain();
+  delayFeedback.gain.value = 0.25;
+  delayWet = ctx.createGain();
+  delayWet.gain.value = 0.2;
+  delayNode.connect(delayFeedback);
+  delayFeedback.connect(delayNode);
+  delayNode.connect(delayWet);
+  delayWet.connect(masterGain);
+
+  // Lo-fi filter (transparent when off)
+  lofiFilter = ctx.createBiquadFilter();
+  lofiFilter.type = 'lowpass';
+  lofiFilter.frequency.value = 22050;
+  lofiFilter.Q.value = 0.5;
+
+  // Reverb
+  reverbNode = ctx.createConvolver();
+  reverbNode.buffer = buildReverbBuffer();
+  reverbSend = ctx.createGain();
+  reverbSend.gain.value = 0.25;
+
+  // Chain: masterGain → compressor → lofiFilter → ctx.destination
+  //        masterGain → compressor → reverbSend → reverbNode → ctx.destination
+  masterGain.connect(compressor);
+  compressor.connect(lofiFilter);
+  lofiFilter.connect(ctx.destination);
+  compressor.connect(reverbSend);
+  reverbSend.connect(reverbNode);
+  reverbNode.connect(ctx.destination);
+
+  // Noise buffer
+  const nLen = ctx.sampleRate * 2;
+  noiseBuffer = ctx.createBuffer(1, nLen, ctx.sampleRate);
+  const nd = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < nLen; i++) nd[i] = Math.random() * 2 - 1;
+}
+
+// ===================================================================
+// SYNTHESIS FUNCTIONS
+// ===================================================================
+function playKick(time, evo) {
+  const m = mood();
+  const osc = ctx.createOscillator(); const gain = ctx.createGain();
+  osc.type = 'sine';
+  const sf = (150 + Math.random() * 20 + evo * 10) * (1 + m.pitchShift);
+  osc.frequency.setValueAtTime(sf, time);
+  osc.frequency.exponentialRampToValueAtTime(35, time + 0.07);
+  gain.gain.setValueAtTime(0.7, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (0.3 + evo * 0.06) * m.decayMult);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(time); osc.stop(time + 0.6);
+  if (evo >= 2) {
+    const sub = ctx.createOscillator(); const sg = ctx.createGain();
+    sub.type = 'sine'; sub.frequency.setValueAtTime(55, time);
+    sg.gain.setValueAtTime(0.3, time);
+    sg.gain.exponentialRampToValueAtTime(0.001, time + 0.25 * m.decayMult);
+    sub.connect(sg); sg.connect(masterGain);
+    sub.start(time); sub.stop(time + 0.35);
+  }
+}
+
+function playSnare(time, evo) {
+  const m = mood();
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+  const nf = ctx.createBiquadFilter(); nf.type = 'bandpass';
+  nf.frequency.value = (3500 + evo * 600 + Math.random() * 300) * m.filterMult; nf.Q.value = 0.8;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.45, time);
+  ng.gain.exponentialRampToValueAtTime(0.001, time + (0.12 + evo * 0.03) * m.decayMult);
+  noise.connect(nf); nf.connect(ng); ng.connect(masterGain);
+  noise.start(time); noise.stop(time + 0.3);
+  const osc = ctx.createOscillator(); osc.type = 'sine';
+  osc.frequency.value = 180 + Math.random() * 30;
+  const og = ctx.createGain();
+  og.gain.setValueAtTime(0.25, time);
+  og.gain.exponentialRampToValueAtTime(0.001, time + 0.07 * m.decayMult);
+  osc.connect(og); og.connect(masterGain);
+  osc.start(time); osc.stop(time + 0.15);
+}
+
+function playHihat(time, evo) {
+  const m = mood();
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+  noise.playbackRate.value = 1 + Math.random() * 0.3;
+  const filt = ctx.createBiquadFilter(); filt.type = 'highpass';
+  filt.frequency.value = (7000 + evo * 800) * m.filterMult;
+  const gain = ctx.createGain();
+  const decay = (0.04 + Math.random() * 0.02 + evo * 0.02) * m.decayMult;
+  gain.gain.setValueAtTime(0.22, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + decay);
+  noise.connect(filt); filt.connect(gain); gain.connect(masterGain);
+  noise.start(time); noise.stop(time + decay + 0.05);
+}
+
+function playBass(time, note, evo) {
+  const m = mood();
+  const osc = ctx.createOscillator();
+  osc.type = evo >= 2 ? 'sawtooth' : 'square';
+  osc.frequency.value = note * (1 + m.pitchShift) + (Math.random() - 0.5) * 2;
+  const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+  filt.frequency.setValueAtTime((600 + evo * 250) * m.filterMult, time);
+  filt.frequency.exponentialRampToValueAtTime(150, time + 0.25);
+  filt.Q.value = 4 + (currentMood === 'spooky' ? 4 : 0);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.3, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (0.28 + evo * 0.04) * m.decayMult);
+  osc.connect(filt); filt.connect(gain); gain.connect(masterGain);
+  osc.start(time); osc.stop(time + 0.5);
+}
+
+function playMelody(time, note, evo) {
+  const m = mood();
+  const o1 = ctx.createOscillator(); const o2 = ctx.createOscillator();
+  o1.type = 'triangle'; o2.type = evo >= 2 ? 'sawtooth' : 'triangle';
+  o1.frequency.value = note * (1 + m.pitchShift);
+  o2.frequency.value = note * (1 + (0.003 + evo * 0.002) * m.detuneMult + m.pitchShift);
+  const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+  filt.frequency.value = (2000 + evo * 800) * m.filterMult;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.18, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (0.35 + evo * 0.1) * m.decayMult);
+  o1.connect(filt); o2.connect(filt);
+  filt.connect(gain); gain.connect(masterGain); gain.connect(delayNode);
+  o1.start(time); o2.start(time); o1.stop(time + 0.6); o2.stop(time + 0.6);
+}
+
+function playPad(time, evo) {
+  const m = mood();
+  const chord = [130.81, 155.56, 196.00];
+  if (evo >= 2) chord.push(233.08);
+  if (currentMood === 'spooky') chord.push(146.83);
+  chord.forEach(freq => {
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.value = freq * (1 + m.pitchShift) + (Math.random() - 0.5) * 1.5 * m.detuneMult;
+    const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+    filt.frequency.value = (350 + evo * 200) * m.filterMult; filt.Q.value = 1;
+    const gain = ctx.createGain();
+    const dur = 2.8 * m.decayMult;
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(0.06 + evo * 0.01, time + 0.6);
+    gain.gain.setValueAtTime(0.06 + evo * 0.01, time + dur * 0.6);
+    gain.gain.linearRampToValueAtTime(0, time + dur);
+    osc.connect(filt); filt.connect(gain);
+    gain.connect(masterGain); gain.connect(delayNode);
+    osc.start(time); osc.stop(time + dur + 0.1);
+  });
+}
+
+function playFX(time, evo) {
+  const m = mood();
+  const modFreq = (80 + Math.random() * 400) * (1 + m.pitchShift);
+  const ratio = 1 + Math.floor(Math.random() * 4);
+  const modIndex = (60 + Math.random() * 200 + evo * 120) * (currentMood === 'wild' ? 1.5 : 1);
+  const mod = ctx.createOscillator(); const modG = ctx.createGain();
+  const carrier = ctx.createOscillator(); const cG = ctx.createGain();
+  mod.frequency.value = modFreq; modG.gain.value = modIndex;
+  carrier.frequency.value = modFreq * ratio;
+  cG.gain.setValueAtTime(0.12, time);
+  cG.gain.exponentialRampToValueAtTime(0.001, time + (0.25 + evo * 0.08) * m.decayMult);
+  mod.connect(modG); modG.connect(carrier.frequency);
+  carrier.connect(cG); cG.connect(masterGain); cG.connect(delayNode);
+  mod.start(time); carrier.start(time);
+  mod.stop(time + 0.5); carrier.stop(time + 0.5);
+}
+
+function playAmbient(time, evo) {
+  const m = mood();
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+  const filt = ctx.createBiquadFilter(); filt.type = 'bandpass';
+  const bf = (200 + Math.random() * 200) * (1 + m.pitchShift);
+  filt.frequency.setValueAtTime(bf, time);
+  filt.frequency.linearRampToValueAtTime(bf + (400 + evo * 300) * m.filterMult, time + 1.5);
+  filt.frequency.linearRampToValueAtTime(bf, time + 3);
+  filt.Q.value = (6 + evo * 2) * (currentMood === 'spooky' ? 1.5 : 1);
+  const gain = ctx.createGain();
+  const dur = 3.2 * m.decayMult;
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(0.07 + evo * 0.02, time + 0.5);
+  gain.gain.setValueAtTime(0.07 + evo * 0.02, time + dur * 0.7);
+  gain.gain.linearRampToValueAtTime(0, time + dur);
+  noise.connect(filt); filt.connect(gain); gain.connect(masterGain);
+  noise.start(time); noise.stop(time + dur + 0.3);
+}
+
+function playClap(time, evo) {
+  const m = mood();
+  const layers = 3 + evo;
+  for (let i = 0; i < layers; i++) {
+    const t = time + i * 0.008;
+    const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+    noise.playbackRate.value = 1.2 + Math.random() * 0.4;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = (1500 + Math.random() * 800) * m.filterMult; bp.Q.value = 1.2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + (0.08 + evo * 0.02) * m.decayMult);
+    noise.connect(bp); bp.connect(g); g.connect(masterGain);
+    noise.start(t); noise.stop(t + 0.2);
+  }
+}
+
+function playArp(time, note, evo) {
+  const m = mood();
+  const scaleNotes = [261.63, 311.13, 349.23, 392.00, 466.16, 523.25];
+  const si = Math.floor(Math.random() * 3);
+  const nc = 3 + Math.min(evo, 2);
+  const sp = currentMood === 'wild' ? 0.04 : 0.06;
+  for (let i = 0; i < nc; i++) {
+    const t = time + i * sp;
+    const freq = scaleNotes[(si + i) % scaleNotes.length] * (1 + m.pitchShift);
+    const osc = ctx.createOscillator(); osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12 * m.decayMult);
+    osc.connect(g); g.connect(masterGain); g.connect(delayNode);
+    osc.start(t); osc.stop(t + 0.2);
+  }
+}
+
+function playVocal(time, evo) {
+  const m = mood();
+  const noise = ctx.createBufferSource(); noise.buffer = noiseBuffer;
+  const formants = currentMood === 'spooky' ?
+    [{f:300,q:12},{f:900,q:10},{f:2300,q:8}] :
+    currentMood === 'wild' ?
+    [{f:700,q:14},{f:1200,q:10},{f:2600,q:6}] :
+    [{f:400,q:12},{f:1000,q:10},{f:2500,q:8}];
+  const mix = ctx.createGain(); mix.gain.value = 0;
+  mix.gain.linearRampToValueAtTime(0.15 + evo * 0.03, time + 0.05);
+  const dur = (0.4 + evo * 0.1) * m.decayMult;
+  mix.gain.setValueAtTime(0.15 + evo * 0.03, time + dur * 0.5);
+  mix.gain.linearRampToValueAtTime(0, time + dur);
+  formants.forEach(f => {
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = f.f * (1 + m.pitchShift + (Math.random() - 0.5) * 0.1);
+    bp.Q.value = f.q;
+    noise.connect(bp); bp.connect(mix);
+  });
+  mix.connect(masterGain); mix.connect(delayNode);
+  noise.start(time); noise.stop(time + dur + 0.2);
+}
+
+function playSub(time, note, evo) {
+  const m = mood();
+  const osc = ctx.createOscillator(); osc.type = 'sine';
+  osc.frequency.value = note * (1 + m.pitchShift);
+  const lfo = ctx.createOscillator(); const lfoG = ctx.createGain();
+  lfo.frequency.value = 0.5 + evo * 0.3; lfoG.gain.value = note * 0.04 * m.detuneMult;
+  lfo.connect(lfoG); lfoG.connect(osc.frequency);
+  const gain = ctx.createGain();
+  const dur = 2.5 * m.decayMult;
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(0.28 + evo * 0.04, time + 0.2);
+  gain.gain.setValueAtTime(0.28 + evo * 0.04, time + dur * 0.6);
+  gain.gain.linearRampToValueAtTime(0, time + dur);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(time); lfo.start(time);
+  osc.stop(time + dur + 0.1); lfo.stop(time + dur + 0.1);
+}
+
+// ── Phase 3 Synths ──
+
+function playPluck(time, note, evo) {
+  const m = mood();
+  const osc = ctx.createOscillator(); osc.type = 'triangle';
+  const freq = note * (1 + m.pitchShift);
+  osc.frequency.setValueAtTime(freq * 1.015, time);
+  osc.frequency.exponentialRampToValueAtTime(freq, time + 0.04);
+  const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(9000, time);
+  filt.frequency.exponentialRampToValueAtTime(1400 + evo * 350, time + 0.12);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.22 + evo * 0.04, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + (0.45 + evo * 0.18) * m.decayMult);
+  osc.connect(filt); filt.connect(gain);
+  gain.connect(masterGain); gain.connect(delayNode);
+  osc.start(time); osc.stop(time + 1.0);
+  if (evo >= 2) {
+    // add a detuned upper partial
+    const o2 = ctx.createOscillator(); o2.type = 'sine';
+    o2.frequency.value = freq * 2.01;
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.07, time);
+    g2.gain.exponentialRampToValueAtTime(0.001, time + 0.25 * m.decayMult);
+    o2.connect(g2); g2.connect(masterGain);
+    o2.start(time); o2.stop(time + 0.4);
+  }
+}
+
+function playChord(time, evo) {
+  const m = mood();
+  // Cm chord stab: root, minor third, fifth, (minor seventh at evo 2+)
+  const freqs = [261.63, 311.13, 392.00];
+  if (evo >= 2) freqs.push(466.16);
+  if (currentMood === 'spooky') freqs.push(220.00); // add lower octave
+  freqs.forEach(freq => {
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.value = freq * (1 + m.pitchShift) + (Math.random() - 0.5) * 2 * m.detuneMult;
+    const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+    filt.frequency.setValueAtTime((2200 + evo * 400) * m.filterMult, time);
+    filt.frequency.exponentialRampToValueAtTime(600, time + 0.18);
+    filt.Q.value = 2.5;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.09, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + (0.24 + evo * 0.06) * m.decayMult);
+    osc.connect(filt); filt.connect(gain); gain.connect(masterGain);
+    osc.start(time); osc.stop(time + 0.5);
+  });
+}
+
+function playGrowl(time, note, evo) {
+  const m = mood();
+  const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+  osc.frequency.value = note * (1 + m.pitchShift);
+  // Waveshaper distortion
+  const ws = ctx.createWaveShaper();
+  const drive = 25 + evo * 18;
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2 / 256) - 1;
+    curve[i] = (Math.PI + drive) * x / (Math.PI + drive * Math.abs(x));
+  }
+  ws.curve = curve; ws.oversample = '2x';
+  const filt = ctx.createBiquadFilter(); filt.type = 'lowpass';
+  filt.frequency.value = (280 + evo * 140) * m.filterMult; filt.Q.value = 3.5;
+  const gain = ctx.createGain();
+  const dur = (1.8 + evo * 0.35) * m.decayMult;
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(0.2 + evo * 0.03, time + 0.06);
+  gain.gain.setValueAtTime(0.2 + evo * 0.03, time + dur * 0.5);
+  gain.gain.linearRampToValueAtTime(0, time + dur);
+  osc.connect(ws); ws.connect(filt); filt.connect(gain); gain.connect(masterGain);
+  osc.start(time); osc.stop(time + dur + 0.15);
+}
+
+function playBell(time, note, evo) {
+  const m = mood();
+  const freq = note * (1 + m.pitchShift);
+  const carrier = ctx.createOscillator(); carrier.type = 'sine';
+  carrier.frequency.value = freq;
+  const modulator = ctx.createOscillator(); modulator.type = 'sine';
+  modulator.frequency.value = freq * 7;
+  const modGain = ctx.createGain();
+  modGain.gain.value = freq * (2.5 + evo * 1.2) * m.detuneMult;
+  const dur = (2.2 + evo * 1.2) * m.decayMult;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.18 + evo * 0.03, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+  modulator.connect(modGain); modGain.connect(carrier.frequency);
+  carrier.connect(gain); gain.connect(masterGain); gain.connect(delayNode);
+  carrier.start(time); modulator.start(time);
+  carrier.stop(time + dur + 0.2); modulator.stop(time + dur + 0.2);
+}
+
+function playSoundForCharacter(char, step, time, evo) {
+  const pattern = char.currentPattern;
+  if (!pattern[step]) return false;
+  const note = char.notes ? char.notes[step % char.notes.length] : 261.63;
+  switch (char.role) {
+    case 'kick':    playKick(time, evo); break;
+    case 'snare':   playSnare(time, evo); break;
+    case 'hihat':   playHihat(time, evo); break;
+    case 'bass':    playBass(time, note, evo); break;
+    case 'melody':  playMelody(time, note, evo); break;
+    case 'pad':     playPad(time, evo); break;
+    case 'fx':      playFX(time, evo); break;
+    case 'ambient': playAmbient(time, evo); break;
+    case 'clap':    playClap(time, evo); break;
+    case 'arp':     playArp(time, note, evo); break;
+    case 'vocal':   playVocal(time, evo); break;
+    case 'sub':     playSub(time, note, evo); break;
+    case 'pluck':   playPluck(time, note, evo); break;
+    case 'chord':   playChord(time, evo); break;
+    case 'growl':   playGrowl(time, note, evo); break;
+    case 'bell':    playBell(time, note, evo); break;
+    default: break;
+  }
+  return true;
+}
+
+// ===================================================================
+// PATTERN MUTATION
+// ===================================================================
+function mutatePattern(charState) {
+  const p = charState.currentPattern;
+  const role = charState.role;
+  const rate = ['kick','snare'].includes(role) ? 0.06 :
+               ['pad','ambient','sub','growl','bell'].includes(role) ? 0.04 : 0.1;
+  for (let i = 0; i < p.length; i++) {
+    if (Math.random() < rate) p[i] = p[i] ? 0 : 1;
+  }
+  if (role === 'kick') p[0] = 1;
+  if (role === 'snare') { p[4] = 1; p[12] = 1; }
+}
+
+// ===================================================================
+// SEQUENCER ENGINE
+// ===================================================================
+const STEPS = 16;
+let tempo = 105;
+let isPlaying = false;
+let currentStep = 0;
+let nextStepTime = 0;
+let schedulerTimer = null;
+const LOOK_AHEAD = 0.1;
+const SCHEDULE_INTERVAL = 25;
+
+const STAGE_SIZE = 12;
+const stageSlots = new Array(STAGE_SIZE).fill(null);
+const evolution = {};
+
+function getEvoLevel(charId) {
+  return evolution[charId] ? evolution[charId].level : 0;
+}
+
+function scheduleStep(step, time) {
+  stageSlots.forEach((charState, slotIdx) => {
+    if (!charState) return;
+    const evo = getEvoLevel(charState.id);
+    const played = playSoundForCharacter(charState, step, time, evo);
+    if (played) {
+      const d = (time - ctx.currentTime) * 1000;
+      setTimeout(() => flashSlot(slotIdx), Math.max(0, d));
+    }
+  });
+  const d = (time - ctx.currentTime) * 1000;
+  setTimeout(() => {
+    updateStepDisplay(step);
+    updateSeqPlayhead(step);
+  }, Math.max(0, d));
+
+  if (step === 0) {
+    stageSlots.forEach(charState => {
+      if (!charState) return;
+      if (!evolution[charState.id]) evolution[charState.id] = { bars: 0, level: 0 };
+      evolution[charState.id].bars++;
+      const bars = evolution[charState.id].bars;
+      const newLevel = bars >= 12 ? 3 : bars >= 6 ? 2 : bars >= 2 ? 1 : 0;
+      if (newLevel !== evolution[charState.id].level) {
+        evolution[charState.id].level = newLevel;
+        renderStage();
+      }
+      mutatePattern(charState);
+      refreshSeqRow(charState.id);
+    });
+    document.getElementById('moon').classList.toggle('bright', stageSlots.filter(Boolean).length >= 5);
+  }
+}
+
+function scheduler() {
+  while (nextStepTime < ctx.currentTime + LOOK_AHEAD) {
+    scheduleStep(currentStep, nextStepTime);
+    nextStepTime += 60.0 / tempo / 4;
+    currentStep = (currentStep + 1) % STEPS;
+  }
+}
+
+function startPlayback() {
+  if (isPlaying) return;
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+  isPlaying = true;
+  currentStep = 0;
+  nextStepTime = ctx.currentTime + 0.05;
+  schedulerTimer = setInterval(scheduler, SCHEDULE_INTERVAL);
+  document.getElementById('btn-play').innerHTML = '&#9724; Stop';
+  document.getElementById('btn-play').classList.add('active');
+  document.body.classList.add('is-playing');
+}
+
+function stopPlayback() {
+  if (!isPlaying) return;
+  isPlaying = false;
+  clearInterval(schedulerTimer); schedulerTimer = null;
+  currentStep = 0;
+  document.getElementById('btn-play').innerHTML = '&#9654; Play';
+  document.getElementById('btn-play').classList.remove('active');
+  document.body.classList.remove('is-playing');
+  document.querySelectorAll('.step-dot').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.seq-step.playing').forEach(el => el.classList.remove('playing'));
+}
+
+function togglePlayback() { isPlaying ? stopPlayback() : startPlayback(); }
+
+// ===================================================================
+// STEP SEQUENCER UI
+// ===================================================================
+let seqOpen = false;
+
+function toggleSequencer() {
+  seqOpen = !seqOpen;
+  document.getElementById('seq-panel').classList.toggle('open', seqOpen);
+  document.getElementById('btn-seq').classList.toggle('seq-active', seqOpen);
+  if (seqOpen) renderSequencer();
+}
+
+function renderSequencer() {
+  const rows = document.getElementById('seq-rows');
+  const active = stageSlots.filter(Boolean);
+  if (active.length === 0) {
+    rows.innerHTML = '<div class="seq-empty">Add creatures to the stage to edit their patterns</div>';
+    return;
+  }
+  rows.innerHTML = '';
+  stageSlots.forEach((cs) => {
+    if (!cs) return;
+    const row = document.createElement('div');
+    row.className = 'seq-row';
+    row.dataset.charId = cs.id;
+
+    const label = document.createElement('div');
+    label.className = 'seq-label';
+    label.innerHTML = `<span class="seq-emoji">${cs.emoji}</span><span class="seq-char-name" style="color:${cs.color}">${cs.name}</span>`;
+
+    const stepsDiv = document.createElement('div');
+    stepsDiv.className = 'seq-steps';
+    for (let i = 0; i < STEPS; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'seq-step' + (cs.currentPattern[i] ? ' on' : '') + (i % 4 === 0 ? ' beat-mark' : '');
+      btn.id = `seq-${cs.id}-${i}`;
+      btn.dataset.charId = cs.id;
+      btn.dataset.step = i;
+      btn.style.setProperty('--step-color', cs.color);
+      btn.addEventListener('click', () => toggleSeqStep(cs.id, i));
+      stepsDiv.appendChild(btn);
+    }
+    row.appendChild(label);
+    row.appendChild(stepsDiv);
+    rows.appendChild(row);
+  });
+}
+
+function toggleSeqStep(charId, stepIdx) {
+  const cs = stageSlots.find(s => s && s.id === charId);
+  if (!cs) return;
+  cs.currentPattern[stepIdx] = cs.currentPattern[stepIdx] ? 0 : 1;
+  const btn = document.getElementById(`seq-${charId}-${stepIdx}`);
+  if (btn) btn.classList.toggle('on', !!cs.currentPattern[stepIdx]);
+}
+
+function updateSeqPlayhead(step) {
+  document.querySelectorAll('.seq-step.playing').forEach(el => el.classList.remove('playing'));
+  document.querySelectorAll(`.seq-step[data-step="${step}"]`).forEach(el => el.classList.add('playing'));
+}
+
+function refreshSeqRow(charId) {
+  const cs = stageSlots.find(s => s && s.id === charId);
+  if (!cs || !seqOpen) return;
+  for (let i = 0; i < STEPS; i++) {
+    const btn = document.getElementById(`seq-${charId}-${i}`);
+    if (btn) btn.classList.toggle('on', !!cs.currentPattern[i]);
+  }
+}
+
+// ===================================================================
+// URL STATE — SHARE & RESTORE
+// ===================================================================
+function encodeState() {
+  const parts = [];
+  stageSlots.forEach((cs, i) => { if (cs) parts.push(`${cs.id}:${i}`); });
+  const p = new URLSearchParams();
+  if (parts.length) p.set('s', parts.join(','));
+  p.set('t', tempo);
+  p.set('v', Math.round((masterGain ? masterGain.gain.value : 0.75) * 100));
+  p.set('m', currentMood);
+  return '#' + p.toString();
+}
+
+function decodeState() {
+  if (!window.location.hash || window.location.hash.length < 2) return;
+  try {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    const s = p.get('s');
+    if (s) {
+      s.split(',').forEach(part => {
+        const [cid, idx] = part.split(':');
+        addToStage(cid, parseInt(idx));
+      });
+    }
+    const t = parseInt(p.get('t'));
+    if (t >= 60 && t <= 160) {
+      tempo = t;
+      const el = document.getElementById('tempo');
+      if (el) { el.value = t; document.getElementById('tempo-val').textContent = t; }
+    }
+    const v = parseInt(p.get('v'));
+    if (v >= 0 && v <= 100 && masterGain) {
+      masterGain.gain.value = v / 100;
+      const el = document.getElementById('volume');
+      if (el) { el.value = v; document.getElementById('volume-val').textContent = v; }
+    }
+    const m = p.get('m');
+    if (m && MOODS[m]) setMood(m);
+    if (stageSlots.some(Boolean)) startPlayback();
+  } catch(e) {}
+}
+
+function copyShareLink() {
+  const url = window.location.href.split('#')[0] + encodeState();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => showToast('🌙 Link copied!'));
+  } else {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('🌙 Link copied!');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ===================================================================
+// UI RENDERING
+// ===================================================================
+function createStars() {
+  const c = document.getElementById('starfield');
+  for (let i = 0; i < 90; i++) {
+    const s = document.createElement('div'); s.className = 'star';
+    const sz = 1 + Math.random() * 2;
+    s.style.width = sz + 'px'; s.style.height = sz + 'px';
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = Math.random() * 100 + '%';
+    s.style.setProperty('--dur', (2 + Math.random() * 4) + 's');
+    s.style.setProperty('--min-o', (0.1 + Math.random() * 0.3).toFixed(2));
+    s.style.setProperty('--max-o', (0.5 + Math.random() * 0.5).toFixed(2));
+    s.style.animationDelay = (Math.random() * 4) + 's';
+    c.appendChild(s);
+  }
+}
+
+function renderStage() {
+  const stage = document.getElementById('stage');
+  stage.innerHTML = '';
+  for (let i = 0; i < STAGE_SIZE; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'stage-slot';
+    slot.dataset.slotIndex = i;
+
+    if (stageSlots[i]) {
+      const char = stageSlots[i];
+      const evo = getEvoLevel(char.id);
+      const displayEmoji = char.evoEmoji ? char.evoEmoji[evo] : char.emoji;
+      slot.classList.add('occupied');
+      if (evo > 0) slot.classList.add('evo-' + evo);
+      slot.style.borderColor = char.color;
+      slot.style.setProperty('--char-color', char.color);
+      slot.style.background = `radial-gradient(circle at center, ${char.color}15, transparent)`;
+
+      let sparkles = '';
+      if (evo >= 3) {
+        for (let s = 0; s < 4; s++) {
+          const sz = 3 + Math.random() * 3;
+          sparkles += `<div class="evo-sparkle" style="width:${sz}px;height:${sz}px;top:${Math.random()*70}%;left:${Math.random()*80+5}%;animation-delay:${s*0.5}s;"></div>`;
+        }
+      }
+
+      slot.innerHTML = `
+        <div class="stage-character" style="--char-color: ${char.color}">
+          <div class="char-avatar" style="background: ${char.bg}; box-shadow: 0 0 ${12 + evo * 6}px ${char.color}${40 + evo * 15};">
+            ${displayEmoji}
+            <div class="evo-ring"></div>
+          </div>
+          <div class="char-name" style="color: ${char.color}">${char.name}</div>
+          <div class="char-role">${char.roleLabel}</div>
+          ${sparkles}
+        </div>`;
+      slot.addEventListener('click', () => removeFromStage(i));
+    } else {
+      slot.innerHTML = `<div class="slot-number">${i + 1}</div>`;
+      slot.addEventListener('click', () => {
+        if (selectedChar !== null) { addToStage(selectedChar, i); selectedChar = null; }
+      });
+    }
+
+    slot.addEventListener('dragover', e => { e.preventDefault(); if (!stageSlots[i]) slot.classList.add('drag-over'); });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop', e => {
+      e.preventDefault(); slot.classList.remove('drag-over');
+      const charId = e.dataTransfer.getData('text/plain');
+      if (charId && !stageSlots[i]) addToStage(charId, i);
+    });
+    stage.appendChild(slot);
+  }
+}
+
+function renderCharacterBar() {
+  const bar = document.getElementById('character-bar');
+  bar.innerHTML = '';
+  CHARACTERS.forEach(char => {
+    const card = document.createElement('div');
+    card.className = 'char-card';
+    card.style.setProperty('--char-color', char.color);
+    const onStage = stageSlots.some(s => s && s.id === char.id);
+    if (onStage) card.classList.add('on-stage');
+    card.draggable = true;
+    card.dataset.charId = char.id;
+    card.innerHTML = `
+      ${char.phase === 3 ? '<div class="phase-badge">P3</div>' : ''}
+      <div class="card-info" data-char-id="${char.id}">?</div>
+      <div class="card-avatar" style="background: ${char.bg}; box-shadow: 0 0 8px ${char.color}30;">${char.emoji}</div>
+      <div class="card-name" style="color: ${char.color}">${char.name}</div>
+      <div class="card-role">${char.roleLabel}</div>`;
+
+    card.addEventListener('dragstart', e => {
+      if (onStage) { e.preventDefault(); return; }
+      e.dataTransfer.setData('text/plain', char.id);
+      e.dataTransfer.effectAllowed = 'move';
+      const ghost = document.getElementById('drag-ghost');
+      ghost.querySelector('.ghost-avatar').innerHTML = char.emoji;
+      ghost.querySelector('.ghost-avatar').style.background = char.bg;
+      ghost.querySelector('.ghost-avatar').style.boxShadow = `0 0 30px ${char.color}60`;
+      const img = new Image();
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+      e.dataTransfer.setDragImage(img, 0, 0);
+      ghost.style.display = 'block';
+      requestAnimationFrame(() => { ghost.style.left = e.clientX - 35 + 'px'; ghost.style.top = e.clientY - 35 + 'px'; });
+    });
+    card.addEventListener('drag', e => {
+      if (e.clientX === 0 && e.clientY === 0) return;
+      const ghost = document.getElementById('drag-ghost');
+      ghost.style.left = e.clientX - 35 + 'px'; ghost.style.top = e.clientY - 35 + 'px';
+    });
+    card.addEventListener('dragend', () => {
+      document.getElementById('drag-ghost').style.display = 'none';
+      document.querySelectorAll('.drag-over').forEach(s => s.classList.remove('drag-over'));
+    });
+    card.addEventListener('click', e => {
+      if (e.target.classList.contains('card-info')) return;
+      if (onStage) return;
+      const emptySlot = stageSlots.indexOf(null);
+      if (emptySlot !== -1) { addToStage(char.id, emptySlot); if (!isPlaying) startPlayback(); }
+    });
+    card.querySelector('.card-info').addEventListener('click', e => { e.stopPropagation(); openLoreCard(char); });
+    bar.appendChild(card);
+  });
+}
+
+let selectedChar = null;
+
+function renderStepDisplay() {
+  const c = document.getElementById('step-display'); c.innerHTML = '';
+  for (let i = 0; i < STEPS; i++) {
+    const d = document.createElement('div');
+    d.className = 'step-dot' + (i % 4 === 0 ? ' beat' : '');
+    d.dataset.step = i; c.appendChild(d);
+  }
+}
+
+function updateStepDisplay(step) {
+  document.querySelectorAll('.step-dot').forEach((d, i) => d.classList.toggle('active', i === step));
+}
+
+function flashSlot(slotIdx) {
+  const slot = document.querySelector(`.stage-slot[data-slot-index="${slotIdx}"]`);
+  if (!slot) return;
+  const sc = slot.querySelector('.stage-character');
+  if (!sc) return;
+  sc.classList.remove('beat-flash'); void sc.offsetWidth; sc.classList.add('beat-flash');
+}
+
+// ===================================================================
+// STAGE MANAGEMENT
+// ===================================================================
+function addToStage(charId, slotIdx) {
+  const charDef = CHARACTERS.find(c => c.id === charId);
+  if (!charDef || stageSlots.some(s => s && s.id === charId) || stageSlots[slotIdx] !== null) return;
+  const pi = Math.floor(Math.random() * charDef.patterns.length);
+  stageSlots[slotIdx] = { ...charDef, currentPattern: [...charDef.patterns[pi]], patternIndex: pi };
+  if (!evolution[charId]) evolution[charId] = { bars: 0, level: 0 };
+  renderStage();
+  renderCharacterBar();
+  if (seqOpen) renderSequencer();
+  if (!isPlaying && stageSlots.some(Boolean)) startPlayback();
+}
+
+function removeFromStage(slotIdx) {
+  const char = stageSlots[slotIdx];
+  if (!char) return;
+  delete evolution[char.id];
+  stageSlots[slotIdx] = null;
+  renderStage();
+  renderCharacterBar();
+  if (seqOpen) renderSequencer();
+  if (stageSlots.every(s => s === null) && isPlaying) stopPlayback();
+}
+
+function shufflePatterns() {
+  stageSlots.forEach(cs => {
+    if (!cs) return;
+    const def = CHARACTERS.find(c => c.id === cs.id);
+    let idx;
+    do { idx = Math.floor(Math.random() * def.patterns.length); }
+    while (idx === cs.patternIndex && def.patterns.length > 1);
+    cs.patternIndex = idx;
+    cs.currentPattern = [...def.patterns[idx]];
+  });
+  if (seqOpen) renderSequencer();
+  const btn = document.getElementById('btn-shuffle');
+  btn.style.background = 'rgba(177, 78, 255, 0.5)';
+  setTimeout(() => btn.style.background = '', 300);
+}
+
+function clearStage() {
+  for (let i = 0; i < STAGE_SIZE; i++) stageSlots[i] = null;
+  Object.keys(evolution).forEach(k => delete evolution[k]);
+  stopPlayback(); renderStage(); renderCharacterBar();
+  if (seqOpen) renderSequencer();
+}
+
+// ===================================================================
+// LORE CARD
+// ===================================================================
+function openLoreCard(char) {
+  const modal = document.getElementById('lore-modal');
+  const card = modal.querySelector('.lore-card');
+  const evo = getEvoLevel(char.id);
+  card.style.setProperty('--lore-color', char.color);
+  document.getElementById('lore-avatar').innerHTML = char.emoji;
+  document.getElementById('lore-avatar').style.background = char.bg;
+  document.getElementById('lore-avatar').style.boxShadow = `0 0 30px ${char.color}50`;
+  document.getElementById('lore-name').textContent = char.name;
+  document.getElementById('lore-name').style.color = char.color;
+  document.getElementById('lore-title').textContent = char.title + ' · ' + char.roleLabel + (char.phase === 3 ? ' · Phase 3' : '');
+  document.getElementById('lore-origin').textContent = char.description;
+  const evoC = document.getElementById('lore-evo'); evoC.innerHTML = '';
+  if (char.evoStages) {
+    char.evoStages.forEach((stage, i) => {
+      const div = document.createElement('div');
+      div.className = 'lore-evo-stage' + (i === evo ? ' current' : '');
+      div.innerHTML = `<div class="evo-label">${i === 0 ? 'Base' : 'Evo ' + i}</div><div class="evo-desc">${stage}</div>`;
+      evoC.appendChild(div);
+    });
+  }
+  const relsC = document.getElementById('lore-rels'); relsC.innerHTML = '';
+  if (char.allies) {
+    char.allies.forEach(ally => {
+      const ac = CHARACTERS.find(c => c.id === ally.id);
+      if (!ac) return;
+      const div = document.createElement('div');
+      div.className = 'lore-rel';
+      div.innerHTML = `<span class="rel-emoji">${ac.emoji}</span> ${ac.name} — ${ally.reason}`;
+      relsC.appendChild(div);
+    });
+  }
+  modal.classList.add('open');
+}
+function closeLoreCard() { document.getElementById('lore-modal').classList.remove('open'); }
+
+// ===================================================================
+// MOOD + FX CONTROLS
+// ===================================================================
+function setMood(m) {
+  currentMood = m;
+  document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.toggle('active-mood', btn.dataset.mood === m));
+  if (delayNode) {
+    delayFeedback.gain.value = m === 'spooky' ? 0.4 : m === 'wild' ? 0.15 : 0.25;
+    delayWet.gain.value = MOODS[m].reverbWet * 0.4; // scale to not overwhelm
+  }
+}
+function cycleMood() {
+  const moods = ['dreamy', 'spooky', 'wild'];
+  setMood(moods[(moods.indexOf(currentMood) + 1) % moods.length]);
+}
+
+function setReverb(val) {
+  if (reverbSend) reverbSend.gain.linearRampToValueAtTime(val / 200, ctx.currentTime + 0.05);
+}
+
+function toggleLofi() {
+  lofiActive = !lofiActive;
+  if (lofiFilter) {
+    lofiFilter.frequency.linearRampToValueAtTime(lofiActive ? 3800 : 22050, ctx.currentTime + 0.08);
+  }
+  document.getElementById('btn-lofi').classList.toggle('lofi-active', lofiActive);
+}
+
+// ===================================================================
+// CONTROLS SETUP
+// ===================================================================
+function setupControls() {
+  document.getElementById('tempo').addEventListener('input', e => {
+    tempo = parseInt(e.target.value);
+    document.getElementById('tempo-val').textContent = tempo;
+    if (delayNode) delayNode.delayTime.value = (60.0 / tempo) * 0.75;
+  });
+  document.getElementById('volume').addEventListener('input', e => {
+    const v = parseInt(e.target.value);
+    document.getElementById('volume-val').textContent = v;
+    if (masterGain) masterGain.gain.value = v / 100;
+  });
+  document.getElementById('reverb').addEventListener('input', e => {
+    const v = parseInt(e.target.value);
+    document.getElementById('reverb-val').textContent = v + '%';
+    setReverb(v);
+  });
+
+  document.getElementById('btn-play').addEventListener('click', togglePlayback);
+  document.getElementById('btn-shuffle').addEventListener('click', shufflePatterns);
+  document.getElementById('btn-clear').addEventListener('click', clearStage);
+  document.getElementById('btn-lofi').addEventListener('click', toggleLofi);
+  document.getElementById('btn-seq').addEventListener('click', toggleSequencer);
+  document.getElementById('btn-share').addEventListener('click', copyShareLink);
+
+  document.querySelectorAll('.mood-btn').forEach(btn => btn.addEventListener('click', () => setMood(btn.dataset.mood)));
+  document.getElementById('lore-close').addEventListener('click', closeLoreCard);
+  document.getElementById('lore-modal').addEventListener('click', e => { if (e.target === document.getElementById('lore-modal')) closeLoreCard(); });
+}
+
+// ===================================================================
+// INIT
+// ===================================================================
+function init() {
+  createStars();
+  renderStepDisplay();
+  renderStage();
+  renderCharacterBar();
+  setupControls();
+
+  document.getElementById('start-screen').addEventListener('click', () => {
+    initAudio();
+    document.getElementById('start-screen').classList.add('hidden');
+    // Restore from URL after a tick (audio context needs to settle)
+    setTimeout(decodeState, 80);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+    if (e.code === 'KeyS') shufflePatterns();
+    if (e.code === 'KeyC' && !e.ctrlKey && !e.metaKey) clearStage();
+    if (e.code === 'KeyM') cycleMood();
+    if (e.code === 'KeyL') toggleLofi();
+    if (e.code === 'KeyR') {
+      const slider = document.getElementById('reverb');
+      const next = (parseInt(slider.value) + 20) % 120;
+      slider.value = next;
+      document.getElementById('reverb-val').textContent = next + '%';
+      setReverb(next);
+    }
+    if (e.code === 'KeyQ') toggleSequencer();
+    if (e.code === 'Escape') closeLoreCard();
+  });
+}
+
+init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
