@@ -470,6 +470,27 @@
 
   .is-playing #stage { border-color: rgba(177, 78, 255, 0.15); }
 
+  /* ===== V5: FUSION ===== */
+  .stage-slot.fuse-over {
+    border-color: #ffd700 !important;
+    background: rgba(255, 215, 0, 0.12) !important;
+    box-shadow: 0 0 24px rgba(255, 215, 0, 0.4);
+    transform: scale(1.07);
+  }
+  .stage-slot.fused {
+    border-style: double; border-width: 3px;
+    animation: fusedShimmer 3s ease-in-out infinite;
+  }
+  @keyframes fusedShimmer {
+    0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, var(--char-color) 40%, transparent); }
+    50% { box-shadow: 0 0 28px color-mix(in srgb, var(--char-color) 70%, transparent); }
+  }
+  .stage-slot.fused:hover .stage-character .char-avatar::after { content: '\26A1'; font-size: 1.4rem; }
+  .fusion-name {
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
   /* ===== CATALYST ZONE ===== */
   #catalyst-zone {
     width: 100%; max-width: 780px;
@@ -548,7 +569,7 @@
   <div class="start-emoji">🌙</div>
   <h1>Moonkit Mixer</h1>
   <p>click anywhere to start jamming</p>
-  <div class="version-tag">v4 — pixel art sprites · catalysts · share</div>
+  <div class="version-tag">v5 — fusion magic · pixel sprites · catalysts</div>
   <div class="shortcuts">Space = play/stop · S = shuffle · C = clear · M = mood · R = reverb · L = lo-fi · Q = sequencer</div>
 </div>
 
@@ -559,8 +580,8 @@
 <!-- APP -->
 <div id="app">
   <header>
-    <h1>🌙 Moonkit Mixer <span style="font-size:0.6em;color:var(--text-muted)">v3</span></h1>
-    <p>drag creatures onto the stage · click ? for lore · click creatures to remove</p>
+    <h1>🌙 Moonkit Mixer <span style="font-size:0.6em;color:var(--text-muted)">v5</span></h1>
+    <p>drag creatures onto the stage · drop one onto another to ⚡ fuse · click ? for lore</p>
   </header>
 
   <div id="stage-container"><div id="stage"></div></div>
@@ -1346,8 +1367,106 @@ function makeSprite(char, evo, size) {
   canvas.style.height = size + 'px';
   canvas.style.imageRendering = 'pixelated';
   canvas.style.flexShrink = '0';
-  drawSprite(canvas, char, evo);
+  if (char.fusion) {
+    drawFusionSprite(canvas, char, size);
+  } else {
+    drawSprite(canvas, char, evo);
+  }
   return canvas;
+}
+
+// ===================================================================
+// V5: FUSION SYSTEM — drop a creature onto an occupied slot to fuse
+// ===================================================================
+function blendHex(c1, c2) {
+  const p = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  const [r1,g1,b1] = p(c1), [r2,g2,b2] = p(c2);
+  const h = n => Math.round(n).toString(16).padStart(2,'0');
+  return '#' + h((r1+r2)/2) + h((g1+g2)/2) + h((b1+b2)/2);
+}
+
+function makeFusion(a, b) {
+  const name = a.name.slice(0, Math.ceil(a.name.length / 2)) +
+               b.name.slice(Math.floor(b.name.length / 2)).toLowerCase();
+  return {
+    fusion: true,
+    id: `fused-${a.id}--${b.id}`,
+    name,
+    color: blendHex(a.color, b.color),
+    bg: `radial-gradient(circle at 35% 35%, #1a0a2e, #06000f)`,
+    roleLabel: `${a.roleLabel}+${b.roleLabel}`,
+    parts: [a, b],
+  };
+}
+
+function drawFusionSprite(canvas, fusion, size) {
+  // left half of part A, right half of part B, glowing seam down the middle
+  const [a, b] = fusion.parts;
+  const ca = document.createElement('canvas'); ca.width = ca.height = size;
+  const cb = document.createElement('canvas'); cb.width = cb.height = size;
+  drawSprite(ca, a, 0);
+  drawSprite(cb, b, 0);
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, size, size);
+  const half = Math.floor(size / 2);
+  g.drawImage(ca, 0, 0, half, size, 0, 0, half, size);
+  g.drawImage(cb, half, 0, size - half, size, half, 0, size - half, size);
+  g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+  g.fillRect(half - 1, 0, 2, size);
+}
+
+function isOnStage(charId) {
+  return stageSlots.some(s => s && (s.id === charId || (s.fusion && s.parts.some(p => p.id === charId))));
+}
+
+function findCharState(charId) {
+  for (const s of stageSlots) {
+    if (!s) continue;
+    if (s.id === charId) return s;
+    if (s.fusion) {
+      const p = s.parts.find(p => p.id === charId);
+      if (p) return p;
+    }
+  }
+  return null;
+}
+
+function fuseIntoSlot(charId, slotIdx) {
+  const occupant = stageSlots[slotIdx];
+  const charDef = CHARACTERS.find(c => c.id === charId);
+  if (!occupant || !charDef || isOnStage(charId)) return;
+  if (occupant.fusion) { showToast('🚫 Already fused to the brim — click it to split first'); return; }
+  const pi = Math.floor(Math.random() * charDef.patterns.length);
+  const partB = { ...charDef, currentPattern: [...charDef.patterns[pi]], patternIndex: pi };
+  const fusion = makeFusion(occupant, partB);
+  delete evolution[occupant.id];
+  stageSlots[slotIdx] = fusion;
+  evolution[fusion.id] = { bars: 0, level: 0 };
+  renderStage();
+  renderCharacterBar();
+  if (seqOpen) renderSequencer();
+  showToast(`⚡ ${occupant.name} + ${partB.name} fused into ${fusion.name}!`);
+  if (!isPlaying) startPlayback();
+}
+
+function unfuse(slotIdx) {
+  const f = stageSlots[slotIdx];
+  if (!f || !f.fusion) return;
+  const [a, b] = f.parts;
+  delete evolution[f.id];
+  stageSlots[slotIdx] = a;
+  evolution[a.id] = { bars: 0, level: 0 };
+  const empty = stageSlots.indexOf(null);
+  if (empty !== -1) {
+    stageSlots[empty] = b;
+    evolution[b.id] = { bars: 0, level: 0 };
+    showToast(`💔 ${f.name} split back into ${a.name} + ${b.name}`);
+  } else {
+    showToast(`💔 ${f.name} split — no room left, ${b.name} wandered off`);
+  }
+  renderStage();
+  renderCharacterBar();
+  if (seqOpen) renderSequencer();
 }
 
 // ===================================================================
@@ -1772,6 +1891,25 @@ function playBell(time, note, evo) {
   carrier.stop(time + dur + 0.2); modulator.stop(time + dur + 0.2);
 }
 
+function playFusionSpark(time, evo) {
+  // bright FM shimmer when both halves of a fusion hit the same step
+  const m = mood();
+  const base = 1318.51 * (1 + m.pitchShift);
+  const carrier = ctx.createOscillator(); carrier.type = 'sine';
+  carrier.frequency.setValueAtTime(base, time);
+  carrier.frequency.exponentialRampToValueAtTime(base * 1.5, time + 0.09);
+  const modOsc = ctx.createOscillator(); modOsc.type = 'sine';
+  modOsc.frequency.value = base * 2.01;
+  const mg = ctx.createGain(); mg.gain.value = 300 + evo * 150;
+  modOsc.connect(mg); mg.connect(carrier.frequency);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.07 + evo * 0.015, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.3 * m.decayMult);
+  carrier.connect(g); g.connect(masterGain); g.connect(delayNode);
+  carrier.start(time); modOsc.start(time);
+  carrier.stop(time + 0.5); modOsc.stop(time + 0.5);
+}
+
 function playSoundForCharacter(char, step, time, evo) {
   const pattern = char.currentPattern;
   if (!pattern[step]) return false;
@@ -1837,7 +1975,14 @@ function scheduleStep(step, time) {
   stageSlots.forEach((charState, slotIdx) => {
     if (!charState) return;
     const evo = getEvoLevel(charState.id);
-    const played = playSoundForCharacter(charState, step, time, evo);
+    let played;
+    if (charState.fusion) {
+      const hits = charState.parts.map(p => playSoundForCharacter(p, step, time, evo));
+      played = hits.some(Boolean);
+      if (hits.every(Boolean)) playFusionSpark(time, evo);
+    } else {
+      played = playSoundForCharacter(charState, step, time, evo);
+    }
     if (played) {
       const d = (time - ctx.currentTime) * 1000;
       setTimeout(() => flashSlot(slotIdx), Math.max(0, d));
@@ -1853,15 +1998,15 @@ function scheduleStep(step, time) {
     stageSlots.forEach(charState => {
       if (!charState) return;
       if (!evolution[charState.id]) evolution[charState.id] = { bars: 0, level: 0 };
-      evolution[charState.id].bars++;
+      evolution[charState.id].bars += charState.fusion ? 2 : 1; // fusions burn twice as bright
       const bars = evolution[charState.id].bars;
       const newLevel = bars >= 12 ? 3 : bars >= 6 ? 2 : bars >= 2 ? 1 : 0;
       if (newLevel !== evolution[charState.id].level) {
         evolution[charState.id].level = newLevel;
         renderStage();
       }
-      mutatePattern(charState);
-      refreshSeqRow(charState.id);
+      const targets = charState.fusion ? charState.parts : [charState];
+      targets.forEach(t => { mutatePattern(t); refreshSeqRow(t.id); });
     });
     document.getElementById('moon').classList.toggle('bright', stageSlots.filter(Boolean).length >= 5);
   }
@@ -1921,21 +2066,29 @@ function renderSequencer() {
     return;
   }
   rows.innerHTML = '';
-  stageSlots.forEach((cs) => {
-    if (!cs) return;
+  const entries = [];
+  stageSlots.forEach((slotState) => {
+    if (!slotState) return;
+    if (slotState.fusion) {
+      slotState.parts.forEach(p => entries.push({ cs: p, evo: getEvoLevel(slotState.id), fused: true }));
+    } else {
+      entries.push({ cs: slotState, evo: getEvoLevel(slotState.id), fused: false });
+    }
+  });
+  entries.forEach(({ cs, evo, fused }) => {
     const row = document.createElement('div');
     row.className = 'seq-row';
     row.dataset.charId = cs.id;
 
     const label = document.createElement('div');
     label.className = 'seq-label';
-    const seqSprite = makeSprite(cs, getEvoLevel(cs.id), 28);
+    const seqSprite = makeSprite(cs, evo, 28);
     seqSprite.style.borderRadius = '4px';
     seqSprite.style.flexShrink = '0';
     const seqName = document.createElement('span');
     seqName.className = 'seq-char-name';
     seqName.style.color = cs.color;
-    seqName.textContent = cs.name;
+    seqName.textContent = (fused ? '⚡' : '') + cs.name;
     label.appendChild(seqSprite);
     label.appendChild(seqName);
 
@@ -1958,7 +2111,7 @@ function renderSequencer() {
 }
 
 function toggleSeqStep(charId, stepIdx) {
-  const cs = stageSlots.find(s => s && s.id === charId);
+  const cs = findCharState(charId);
   if (!cs) return;
   cs.currentPattern[stepIdx] = cs.currentPattern[stepIdx] ? 0 : 1;
   const btn = document.getElementById(`seq-${charId}-${stepIdx}`);
@@ -1971,7 +2124,7 @@ function updateSeqPlayhead(step) {
 }
 
 function refreshSeqRow(charId) {
-  const cs = stageSlots.find(s => s && s.id === charId);
+  const cs = findCharState(charId);
   if (!cs || !seqOpen) return;
   for (let i = 0; i < STEPS; i++) {
     const btn = document.getElementById(`seq-${charId}-${i}`);
@@ -1984,7 +2137,10 @@ function refreshSeqRow(charId) {
 // ===================================================================
 function encodeState() {
   const parts = [];
-  stageSlots.forEach((cs, i) => { if (cs) parts.push(`${cs.id}:${i}`); });
+  stageSlots.forEach((cs, i) => {
+    if (!cs) return;
+    parts.push(cs.fusion ? `${cs.parts[0].id}+${cs.parts[1].id}:${i}` : `${cs.id}:${i}`);
+  });
   const p = new URLSearchParams();
   if (parts.length) p.set('s', parts.join(','));
   p.set('t', tempo);
@@ -2001,7 +2157,14 @@ function decodeState() {
     if (s) {
       s.split(',').forEach(part => {
         const [cid, idx] = part.split(':');
-        addToStage(cid, parseInt(idx));
+        const slotIdx = parseInt(idx);
+        if (cid.includes('+')) {
+          const [idA, idB] = cid.split('+');
+          addToStage(idA, slotIdx);
+          fuseIntoSlot(idB, slotIdx);
+        } else {
+          addToStage(cid, slotIdx);
+        }
       });
     }
     const t = parseInt(p.get('t'));
@@ -2074,6 +2237,7 @@ function renderStage() {
       const char = stageSlots[i];
       const evo = getEvoLevel(char.id);
       slot.classList.add('occupied');
+      if (char.fusion) slot.classList.add('fused');
       if (evo > 0) slot.classList.add('evo-' + evo);
       slot.style.borderColor = char.color;
       slot.style.setProperty('--char-color', char.color);
@@ -2094,7 +2258,12 @@ function renderStage() {
 
       const nameEl = document.createElement('div');
       nameEl.className = 'char-name';
-      nameEl.style.color = char.color;
+      if (char.fusion) {
+        nameEl.classList.add('fusion-name');
+        nameEl.style.backgroundImage = `linear-gradient(90deg, ${char.parts[0].color}, ${char.parts[1].color})`;
+      } else {
+        nameEl.style.color = char.color;
+      }
       nameEl.textContent = char.name;
 
       const roleEl = document.createElement('div');
@@ -2116,7 +2285,7 @@ function renderStage() {
       }
 
       slot.appendChild(charEl);
-      slot.addEventListener('click', () => removeFromStage(i));
+      slot.addEventListener('click', () => char.fusion ? unfuse(i) : removeFromStage(i));
     } else {
       slot.innerHTML = `<div class="slot-number">${i + 1}</div>`;
       slot.addEventListener('click', () => {
@@ -2124,12 +2293,17 @@ function renderStage() {
       });
     }
 
-    slot.addEventListener('dragover', e => { e.preventDefault(); if (!stageSlots[i]) slot.classList.add('drag-over'); });
-    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+    slot.addEventListener('dragover', e => {
+      e.preventDefault();
+      slot.classList.add(stageSlots[i] ? 'fuse-over' : 'drag-over');
+    });
+    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over', 'fuse-over'));
     slot.addEventListener('drop', e => {
-      e.preventDefault(); slot.classList.remove('drag-over');
+      e.preventDefault(); slot.classList.remove('drag-over', 'fuse-over');
       const charId = e.dataTransfer.getData('text/plain');
-      if (charId && !stageSlots[i]) addToStage(charId, i);
+      if (!charId) return;
+      if (stageSlots[i]) fuseIntoSlot(charId, i);
+      else addToStage(charId, i);
     });
     stage.appendChild(slot);
   }
@@ -2142,7 +2316,7 @@ function renderCharacterBar() {
     const card = document.createElement('div');
     card.className = 'char-card';
     card.style.setProperty('--char-color', char.color);
-    const onStage = stageSlots.some(s => s && s.id === char.id);
+    const onStage = isOnStage(char.id);
     if (onStage) card.classList.add('on-stage');
     card.draggable = true;
     card.dataset.charId = char.id;
@@ -2326,7 +2500,7 @@ function flashSlot(slotIdx) {
 // ===================================================================
 function addToStage(charId, slotIdx) {
   const charDef = CHARACTERS.find(c => c.id === charId);
-  if (!charDef || stageSlots.some(s => s && s.id === charId) || stageSlots[slotIdx] !== null) return;
+  if (!charDef || isOnStage(charId) || stageSlots[slotIdx] !== null) return;
   const pi = Math.floor(Math.random() * charDef.patterns.length);
   stageSlots[slotIdx] = { ...charDef, currentPattern: [...charDef.patterns[pi]], patternIndex: pi };
   if (!evolution[charId]) evolution[charId] = { bars: 0, level: 0 };
@@ -2350,12 +2524,15 @@ function removeFromStage(slotIdx) {
 function shufflePatterns() {
   stageSlots.forEach(cs => {
     if (!cs) return;
-    const def = CHARACTERS.find(c => c.id === cs.id);
-    let idx;
-    do { idx = Math.floor(Math.random() * def.patterns.length); }
-    while (idx === cs.patternIndex && def.patterns.length > 1);
-    cs.patternIndex = idx;
-    cs.currentPattern = [...def.patterns[idx]];
+    const targets = cs.fusion ? cs.parts : [cs];
+    targets.forEach(t => {
+      const def = CHARACTERS.find(c => c.id === t.id);
+      let idx;
+      do { idx = Math.floor(Math.random() * def.patterns.length); }
+      while (idx === t.patternIndex && def.patterns.length > 1);
+      t.patternIndex = idx;
+      t.currentPattern = [...def.patterns[idx]];
+    });
   });
   if (seqOpen) renderSequencer();
   const btn = document.getElementById('btn-shuffle');
