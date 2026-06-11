@@ -367,6 +367,9 @@
     align-items: center; gap: 4px;
     cursor: grab; transition: all 0.25s ease;
     position: relative;
+    /* touch drag: keep the browser from claiming the gesture for scrolling */
+    touch-action: none;
+    -webkit-touch-callout: none;
   }
   .char-card:hover {
     transform: translateY(-4px);
@@ -569,7 +572,7 @@
   <div class="start-emoji">🌙</div>
   <h1>Moonkit Mixer</h1>
   <p>click anywhere to start jamming</p>
-  <div class="version-tag">v5 — fusion magic · pixel sprites · catalysts</div>
+  <div class="version-tag">v6 — touch drag · fusion magic · catalysts</div>
   <div class="shortcuts">Space = play/stop · S = shuffle · C = clear · M = mood · R = reverb · L = lo-fi · Q = sequencer</div>
 </div>
 
@@ -580,7 +583,7 @@
 <!-- APP -->
 <div id="app">
   <header>
-    <h1>🌙 Moonkit Mixer <span style="font-size:0.6em;color:var(--text-muted)">v5</span></h1>
+    <h1>🌙 Moonkit Mixer <span style="font-size:0.6em;color:var(--text-muted)">v6</span></h1>
     <p>drag creatures onto the stage · drop one onto another to ⚡ fuse · click ? for lore</p>
   </header>
 
@@ -2350,8 +2353,12 @@ function renderCharacterBar() {
     cardRole.textContent = char.roleLabel;
     card.appendChild(cardRole);
 
+    card.addEventListener('pointerdown', e => {
+      if (onStage) return;
+      touchDragStart(e, char);
+    });
     card.addEventListener('dragstart', e => {
-      if (onStage) { e.preventDefault(); return; }
+      if (onStage || (touchDrag && touchDrag.active)) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', char.id);
       e.dataTransfer.effectAllowed = 'move';
       const ghost = document.getElementById('drag-ghost');
@@ -2376,6 +2383,7 @@ function renderCharacterBar() {
       document.querySelectorAll('.drag-over').forEach(s => s.classList.remove('drag-over'));
     });
     card.addEventListener('click', e => {
+      if (suppressNextCardClick) return;
       if (e.target.classList.contains('card-info')) return;
       if (onStage) return;
       const emptySlot = stageSlots.indexOf(null);
@@ -2387,6 +2395,83 @@ function renderCharacterBar() {
 }
 
 let selectedChar = null;
+
+// ===================================================================
+// V6: TOUCH DRAG — HTML5 drag events never fire on touchscreens, so
+// touch/pen get a pointer-events path into the same add/fuse handlers
+// ===================================================================
+let touchDrag = null;
+let suppressNextCardClick = false;
+
+function slotFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('.stage-slot') : null;
+}
+
+function clearSlotHighlights() {
+  document.querySelectorAll('.drag-over, .fuse-over').forEach(s => s.classList.remove('drag-over', 'fuse-over'));
+}
+
+function touchDragStart(e, char) {
+  if (e.pointerType === 'mouse') return; // mouse keeps native HTML5 drag
+  touchDrag = {
+    char, pointerId: e.pointerId,
+    startX: e.clientX, startY: e.clientY,
+    active: false,
+  };
+}
+
+function touchDragMove(e) {
+  if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+  const ghost = document.getElementById('drag-ghost');
+  if (!touchDrag.active) {
+    // ignore micro-movement so plain taps still behave like clicks
+    if (Math.hypot(e.clientX - touchDrag.startX, e.clientY - touchDrag.startY) < 8) return;
+    touchDrag.active = true;
+    const ghostAvatar = ghost.querySelector('.ghost-avatar');
+    ghostAvatar.innerHTML = '';
+    ghostAvatar.style.background = touchDrag.char.bg;
+    ghostAvatar.style.boxShadow = `0 0 30px ${touchDrag.char.color}60`;
+    ghostAvatar.appendChild(makeSprite(touchDrag.char, 0, 56));
+    ghost.style.display = 'block';
+  }
+  ghost.style.left = e.clientX - 35 + 'px';
+  ghost.style.top = e.clientY - 70 + 'px'; // above the finger, not under it
+  clearSlotHighlights();
+  const slot = slotFromPoint(e.clientX, e.clientY);
+  if (slot) slot.classList.add(stageSlots[parseInt(slot.dataset.slotIndex)] ? 'fuse-over' : 'drag-over');
+}
+
+function touchDragEnd(e) {
+  if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+  const drag = touchDrag;
+  touchDrag = null;
+  if (!drag.active) return; // was a tap — let the click handler take it
+  document.getElementById('drag-ghost').style.display = 'none';
+  clearSlotHighlights();
+  const slot = slotFromPoint(e.clientX, e.clientY);
+  if (slot) {
+    const i = parseInt(slot.dataset.slotIndex);
+    if (stageSlots[i]) fuseIntoSlot(drag.char.id, i);
+    else addToStage(drag.char.id, i);
+  }
+  // browsers may still synthesize a click on the card after the drag
+  suppressNextCardClick = true;
+  setTimeout(() => { suppressNextCardClick = false; }, 350);
+}
+
+function touchDragCancel(e) {
+  if (!touchDrag || e.pointerId !== touchDrag.pointerId) return;
+  touchDrag = null;
+  document.getElementById('drag-ghost').style.display = 'none';
+  clearSlotHighlights();
+}
+
+function setupTouchDrag() {
+  document.addEventListener('pointermove', touchDragMove, { passive: true });
+  document.addEventListener('pointerup', touchDragEnd);
+  document.addEventListener('pointercancel', touchDragCancel);
+}
 
 // ===================================================================
 // CATALYST SYSTEM
@@ -2691,6 +2776,7 @@ function init() {
   renderCharacterBar();
   renderCatalystBar();
   setupControls();
+  setupTouchDrag();
 
   document.getElementById('start-screen').addEventListener('click', () => {
     initAudio();
